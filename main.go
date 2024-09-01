@@ -10,7 +10,7 @@ import (
 	"syscall"
 )
 
-var server RedisServer
+var server redisServer
 var wg sync.WaitGroup
 
 func main() {
@@ -25,7 +25,7 @@ func main() {
 	//监听系统关闭信号
 	sigCh := make(chan os.Signal)
 	signal.Notify(sigCh, syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT)
-	go func(server *RedisServer) {
+	go func(server *redisServer) {
 		sig := <-sigCh
 		switch sig {
 		case syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT:
@@ -47,7 +47,7 @@ func main() {
 	server.listen = listen
 
 	//监听程序关闭
-	go func(server *RedisServer) {
+	go func(server *redisServer) {
 		<-server.shutDownCh
 		log.Println("preparing to shut down the Redis server.")
 		closeRedisService()
@@ -55,7 +55,7 @@ func main() {
 	}(&server)
 
 	//监听客户端主动关闭
-	go func(server *RedisServer) {
+	go func(server *redisServer) {
 		for {
 			c := <-server.closeClientCh
 			log.Println("receive close client signal")
@@ -65,7 +65,7 @@ func main() {
 		}
 	}(&server)
 
-	go func(s *RedisServer) {
+	go func(s *redisServer) {
 		for redisClient := range s.commandCh {
 			processCommand(&redisClient)
 		}

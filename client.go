@@ -16,7 +16,7 @@ const (
 	REDIS_REQ_MULTIBULK = 2
 )
 
-type RedisClient struct {
+type redisClient struct {
 	conn         net.Conn
 	argc         uint64
 	argv         []string
@@ -27,13 +27,13 @@ type RedisClient struct {
 	lastCmd      RedisCommand
 }
 
-func (c *RedisClient) ReadQueryFromClient(CloseClientCh chan RedisClient, commandCh chan RedisClient) {
+func (c *redisClient) ReadQueryFromClient(CloseClientCh chan redisClient, commandCh chan redisClient) {
 	reader := bufio.NewReader(c.conn)
 
 	processInputBuffer(c, reader, CloseClientCh, commandCh)
 }
 
-func processInputBuffer(c *RedisClient, reader *bufio.Reader, CloseClientCh chan RedisClient, commandCh chan RedisClient) {
+func processInputBuffer(c *redisClient, reader *bufio.Reader, CloseClientCh chan redisClient, commandCh chan redisClient) {
 	for {
 		c.multibulklen = -1
 		bytes, err := reader.ReadBytes('\n')
@@ -82,7 +82,7 @@ func processInputBuffer(c *RedisClient, reader *bufio.Reader, CloseClientCh chan
 
 }
 
-func processMultibulkBuffer(c *RedisClient, reader *bufio.Reader, CloseClientCh chan RedisClient) error {
+func processMultibulkBuffer(c *redisClient, reader *bufio.Reader, CloseClientCh chan redisClient) error {
 	c.argc = 0
 
 	ll := int64(-1)
@@ -130,6 +130,6 @@ func processMultibulkBuffer(c *RedisClient, reader *bufio.Reader, CloseClientCh 
 	return nil
 }
 
-func (c RedisClient) string() string {
+func (c redisClient) string() string {
 	return fmt.Sprintf("%#v", c)
 }

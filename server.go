@@ -31,12 +31,12 @@ const (
 	REDIS_CALL_FULL      = (REDIS_CALL_SLOWLOG | REDIS_CALL_STATS | REDIS_CALL_PROPAGATE)
 )
 
-type RedisServer struct {
+type redisServer struct {
 	ip            string
 	port          int
 	shutDownCh    chan struct{}
-	commandCh     chan RedisClient
-	closeClientCh chan RedisClient
+	commandCh     chan redisClient
+	closeClientCh chan redisClient
 	done          atomic.Int32
 	clients       sync.Map
 	listen        net.Listener
@@ -48,8 +48,8 @@ func initServer() {
 	server.ip = "localhost"
 	server.port = 6379
 	server.shutDownCh = make(chan struct{})
-	server.closeClientCh = make(chan RedisClient)
-	server.commandCh = make(chan RedisClient)
+	server.closeClientCh = make(chan redisClient)
+	server.commandCh = make(chan redisClient)
 	server.commands = make(map[string]RedisCommand)
 
 	createSharedObjects()
@@ -67,7 +67,7 @@ func acceptTcpHandler(conn net.Conn) {
 
 	}
 
-	c := &RedisClient{conn: conn, argc: 0, argv: make([]string, 0), multibulklen: -1}
+	c := &redisClient{conn: conn, argc: 0, argv: make([]string, 0), multibulklen: -1}
 	server.clients.Store(c.string(), c)
 	go c.ReadQueryFromClient(server.closeClientCh, server.commandCh)
 
@@ -77,7 +77,7 @@ func closeRedisService() {
 	log.Println("close listen and all redis client")
 	_ = server.listen.Close()
 	server.clients.Range(func(key, value any) bool {
-		client := value.(*RedisClient)
+		client := value.(*redisClient)
 		_ = client.conn.Close()
 		server.clients.Delete(key)
 		return true
@@ -130,7 +130,7 @@ func populateCommandTable() {
 	}
 }
 
-func processCommand(c *RedisClient) {
+func processCommand(c *redisClient) {
 	redisCommand, exists := server.commands[strings.ToUpper(c.argv[0])]
 	if !exists {
 		c.conn.Write([]byte("-ERR unknown command\r\n"))
@@ -142,7 +142,7 @@ func processCommand(c *RedisClient) {
 	call(c, REDIS_CALL_FULL)
 }
 
-func call(c *RedisClient, flags int) {
+func call(c *redisClient, flags int) {
 	c.cmd.proc(c)
 
 	//todo aof use flags

@@ -5,7 +5,7 @@ import (
 	"strconv"
 )
 
-type redisCommandProc func(redisClient *RedisClient)
+type redisCommandProc func(redisClient *redisClient)
 
 type RedisCommand struct {
 	name  string
@@ -27,7 +27,7 @@ type sharedObjectsStruct struct {
 	pong string
 }
 
-func CommandCommand(c *RedisClient) {
+func CommandCommand(c *redisClient) {
 	reply := "*" + strconv.Itoa(len(server.commands)) + shared.crlf
 	for _, command := range server.commands {
 		reply += "$" + strconv.Itoa(len(command.name)) + shared.crlf + command.name + shared.crlf
@@ -37,7 +37,7 @@ func CommandCommand(c *RedisClient) {
 	addReply(c, reply)
 }
 
-func PingCommand(c *RedisClient) {
+func PingCommand(c *redisClient) {
 	addReply(c, shared.pong)
 }
 
@@ -50,6 +50,6 @@ func createSharedObjects() {
 	}
 }
 
-func addReply(c *RedisClient, reply string) {
+func addReply(c *redisClient, reply string) {
 	c.conn.Write([]byte(reply))
 }
