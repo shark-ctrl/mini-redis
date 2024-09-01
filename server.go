@@ -32,15 +32,19 @@ const (
 )
 
 type redisServer struct {
-	ip            string
-	port          int
+	//record the ip and port number of the redis server.
+	ip   string
+	port int
+	//semaphore used to notify shutdown.
 	shutDownCh    chan struct{}
 	commandCh     chan redisClient
 	closeClientCh chan redisClient
 	done          atomic.Int32
-	clients       sync.Map
-	listen        net.Listener
-	commands      map[string]RedisCommand
+	//record all connected clients.
+	clients sync.Map
+	//listen and process new connections.
+	listen   net.Listener
+	commands map[string]RedisCommand
 }
 
 func initServer() {
@@ -60,20 +64,20 @@ func loadServerConfig() {
 }
 
 func acceptTcpHandler(conn net.Conn) {
-
+	//the current server is being or has been shut down, and no new connections are being processed.
 	if server.done.Load() == 1 {
 		log.Println("the current service is being shut down. The connection is denied.")
 		_ = conn.Close()
 
 	}
-
+	//init the redis client and handles network read and write events.
 	c := &redisClient{conn: conn, argc: 0, argv: make([]string, 0), multibulklen: -1}
 	server.clients.Store(c.string(), c)
-	go c.ReadQueryFromClient(server.closeClientCh, server.commandCh)
+	go readQueryFromClient(c, server.closeClientCh, server.commandCh)
 
 }
 
-func closeRedisService() {
+func closeRedisServer() {
 	log.Println("close listen and all redis client")
 	_ = server.listen.Close()
 	server.clients.Range(func(key, value any) bool {

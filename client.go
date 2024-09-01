@@ -17,6 +17,7 @@ const (
 )
 
 type redisClient struct {
+	//redis client connection info
 	conn         net.Conn
 	argc         uint64
 	argv         []string
@@ -27,7 +28,7 @@ type redisClient struct {
 	lastCmd      RedisCommand
 }
 
-func (c *redisClient) ReadQueryFromClient(CloseClientCh chan redisClient, commandCh chan redisClient) {
+func readQueryFromClient(c *redisClient, CloseClientCh chan redisClient, commandCh chan redisClient) {
 	reader := bufio.NewReader(c.conn)
 
 	processInputBuffer(c, reader, CloseClientCh, commandCh)
