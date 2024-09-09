@@ -26,6 +26,7 @@ type redisClient struct {
 	queryBuf     []byte
 	cmd          RedisCommand
 	lastCmd      RedisCommand
+	db           *redisDb
 }
 
 func readQueryFromClient(c *redisClient, CloseClientCh chan redisClient, commandCh chan redisClient) {

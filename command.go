@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"strconv"
+	"strings"
 )
 
 type redisCommandProc func(redisClient *redisClient)
@@ -15,19 +16,20 @@ type RedisCommand struct {
 }
 
 var redisCommandTable = []RedisCommand{
-	{name: "COMMAND", proc: CommandCommand, sflag: "rlt", flag: 0},
-	{name: "PING", proc: PingCommand, sflag: "rtF", flag: 0},
+	{name: "COMMAND", proc: commandCommand, sflag: "rlt", flag: 0},
+	{name: "PING", proc: pingCommand, sflag: "rtF", flag: 0},
 }
 var shared sharedObjectsStruct
 
 type sharedObjectsStruct struct {
-	crlf string
-	ok   string
-	err  string
-	pong string
+	crlf      string
+	ok        string
+	err       string
+	pong      string
+	syntaxerr string
 }
 
-func CommandCommand(c *redisClient) {
+func commandCommand(c *redisClient) {
 	reply := "*" + strconv.Itoa(len(server.commands)) + shared.crlf
 	for _, command := range server.commands {
 		reply += "$" + strconv.Itoa(len(command.name)) + shared.crlf + command.name + shared.crlf
@@ -37,19 +39,73 @@ func CommandCommand(c *redisClient) {
 	addReply(c, reply)
 }
 
-func PingCommand(c *redisClient) {
+func pingCommand(c *redisClient) {
 	addReply(c, shared.pong)
+}
+
+func setCommand(c *redisClient) {
+	var j uint64
+	var expire string
+	unit := UNIT_SECONDS
+	flags := REDIS_SET_NO_FLAGS
+
+	for j = 3; j < c.argc; j++ {
+		a := c.argv[j]
+		var next string
+		if j == c.argc-1 {
+			next = ""
+		} else {
+			next = c.argv[j+1]
+		}
+
+		if strings.ToLower(a) == "nx" {
+			flags |= REDIS_SET_NX
+		} else if strings.ToLower(a) == "xx" {
+			flags |= REDIS_SET_XX
+		} else if strings.ToLower(a) == "ex" {
+			unit = UNIT_SECONDS
+			expire = next
+			j++
+		} else if strings.ToLower(a) == "px" {
+			unit = UNIT_MILLISECONDS
+			expire = next
+			j++
+		} else {
+			addReply(c, shared.syntaxerr)
+			return
+		}
+	}
+
+	setGenericCommand(c, flags, c.argv[1], c.argv[2], expire, unit, "", "")
+}
+
+func setGenericCommand(c *redisClient, flags int, key string, val string, expire string, unit int, ok_reply string, abort_reply string) {
+	var milliseconds *uint64
+	if expire != "" {
+		if getLongLongFromObjectOrReply(c, expire, milliseconds, "") != REDIS_OK {
+			return
+		}
+
+		if unit == UNIT_SECONDS {
+			*milliseconds = *milliseconds * 1000
+		}
+	}
+
+	//todo should complete the persistence configuration and db query logic
+
 }
 
 func createSharedObjects() {
 	shared = sharedObjectsStruct{
-		crlf: "\r\n",
-		ok:   "+OK\r\n",
-		err:  "-ERR\r\n",
-		pong: "+PONG\r\n",
+		crlf:      "\r\n",
+		ok:        "+OK\r\n",
+		err:       "-ERR\r\n",
+		pong:      "+PONG\r\n",
+		syntaxerr: "-ERR syntax error\r\n",
 	}
 }
 
-func addReply(c *redisClient, reply string) {
-	c.conn.Write([]byte(reply))
+func selectDb(c *redisClient, id int) {
+	c.db = &server.db[id]
+
 }

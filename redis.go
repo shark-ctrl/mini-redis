@@ -29,6 +29,16 @@ const (
 	REDIS_CALL_STATS     = 2
 	REDIS_CALL_PROPAGATE = 4
 	REDIS_CALL_FULL      = (REDIS_CALL_SLOWLOG | REDIS_CALL_STATS | REDIS_CALL_PROPAGATE)
+
+	/* Units */
+	UNIT_SECONDS      = 0
+	UNIT_MILLISECONDS = 1
+
+	REDIS_SET_NO_FLAGS = 0
+	REDIS_SET_NX       = (1 << 0) /* Set if key not exists. */
+	REDIS_SET_XX       = (1 << 1) /* Set if key exists. */
+
+	REDIS_DEFAULT_DBNUM = 16
 )
 
 type redisServer struct {
@@ -45,6 +55,8 @@ type redisServer struct {
 	//listen and process new connections.
 	listen   net.Listener
 	commands map[string]RedisCommand
+	db       []redisDb
+	dbnum    int
 }
 
 func initServer() {
@@ -57,10 +69,18 @@ func initServer() {
 	server.commands = make(map[string]RedisCommand)
 
 	createSharedObjects()
+	server.db = make([]redisDb, server.dbnum)
+
+	for j := 0; j < server.dbnum; j++ {
+		server.db[j].id = j
+		server.db[j].dict = make(map[string]interface{})
+		server.db[j].expires = make(map[string]uint64)
+	}
 }
 
 func loadServerConfig() {
 	log.Println("load redis server config")
+	server.dbnum = REDIS_DEFAULT_DBNUM
 }
 
 func acceptTcpHandler(conn net.Conn) {
@@ -71,10 +91,16 @@ func acceptTcpHandler(conn net.Conn) {
 
 	}
 	//init the redis client and handles network read and write events.
-	c := &redisClient{conn: conn, argc: 0, argv: make([]string, 0), multibulklen: -1}
+	c := createClient(conn)
 	server.clients.Store(c.string(), c)
 	go readQueryFromClient(c, server.closeClientCh, server.commandCh)
 
+}
+
+func createClient(conn net.Conn) *redisClient {
+	c := redisClient{conn: conn, argc: 0, argv: make([]string, 0), multibulklen: -1}
+	selectDb(&c, 0)
+	return &c
 }
 
 func closeRedisServer() {

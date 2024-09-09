@@ -18,9 +18,9 @@ func main() {
 	wg.Add(1)
 
 	//initialize redis server and configuration
-	initServer()
 	loadServerConfig()
 	initServerConfig()
+	initServer()
 
 	//listen to the shutdown signal
 	sigCh := make(chan os.Signal)
