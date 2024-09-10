@@ -54,7 +54,7 @@ type redisServer struct {
 	clients sync.Map
 	//listen and process new connections.
 	listen   net.Listener
-	commands map[string]RedisCommand
+	commands map[string]redisCommand
 	db       []redisDb
 	dbnum    int
 }
@@ -66,7 +66,6 @@ func initServer() {
 	server.shutDownCh = make(chan struct{})
 	server.closeClientCh = make(chan redisClient)
 	server.commandCh = make(chan redisClient)
-	server.commands = make(map[string]RedisCommand)
 
 	createSharedObjects()
 	server.db = make([]redisDb, server.dbnum)
@@ -74,7 +73,7 @@ func initServer() {
 	for j := 0; j < server.dbnum; j++ {
 		server.db[j].id = j
 		server.db[j].dict = make(map[string]interface{})
-		server.db[j].expires = make(map[string]uint64)
+		server.db[j].expires = make(map[string]int64)
 	}
 }
 
@@ -117,10 +116,13 @@ func closeRedisServer() {
 }
 
 func initServerConfig() {
+	server.commands = make(map[string]redisCommand)
+
 	populateCommandTable()
 }
 
 func populateCommandTable() {
+
 	for i := 0; i < len(redisCommandTable); i++ {
 		redisCommand := redisCommandTable[i]
 		for _, f := range redisCommand.sflag {

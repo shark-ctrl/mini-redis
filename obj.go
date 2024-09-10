@@ -8,9 +8,9 @@ const (
 	REDIS_ERR = -1
 )
 
-func getLongLongFromObjectOrReply(c *redisClient, expire string, target *uint64, msg string) int {
-	var value uint64
-	value, err := strconv.ParseUint(expire, 10, 64)
+func getLongLongFromObjectOrReply(c *redisClient, expire string, target *int64, msg string) int {
+	var value int64
+	value, err := strconv.ParseInt(expire, 10, 64)
 	if err != nil {
 		addReply(c, "invalid value")
 		return REDIS_ERR

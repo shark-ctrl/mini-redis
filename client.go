@@ -24,8 +24,8 @@ type redisClient struct {
 	multibulklen int64
 	reqType      int
 	queryBuf     []byte
-	cmd          RedisCommand
-	lastCmd      RedisCommand
+	cmd          redisCommand
+	lastCmd      redisCommand
 	db           *redisDb
 }
 
@@ -104,7 +104,7 @@ func processMultibulkBuffer(c *redisClient, reader *bufio.Reader, CloseClientCh 
 			return errors.New("ERR unknown command")
 		}
 
-		if c.queryBuf[0] == '$' && ll < 0 {
+		if c.queryBuf[0] == '$' {
 			ll, e = strconv.ParseInt(string(c.queryBuf[1:len(c.queryBuf)-2]), 10, 32)
 			if e != nil || ll <= 0 {
 				return e
@@ -122,8 +122,6 @@ func processMultibulkBuffer(c *redisClient, reader *bufio.Reader, CloseClientCh 
 
 			c.argv[c.argc] = string(c.queryBuf[0 : len(c.queryBuf)-2])
 			c.argc++
-		} else if c.queryBuf[0] == '$' && ll > 0 {
-			return errors.New("ERR unknown command")
 		} else if c.queryBuf[0] != '$' && ll < 0 { //未解析到长度就遇到其他的字符
 			return errors.New("ERR unknown command")
 		}
