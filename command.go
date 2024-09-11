@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -39,7 +38,6 @@ func commandCommand(c *redisClient) {
 		reply += "$" + strconv.Itoa(len(command.name)) + shared.crlf + command.name + shared.crlf
 	}
 
-	log.Println("command:" + reply)
 	addReply(c, reply)
 }
 
@@ -85,6 +83,7 @@ func setCommand(c *redisClient) {
 
 func setGenericCommand(c *redisClient, flags int, key string, val string, expire string, unit int, ok_reply string, abort_reply string) {
 	var milliseconds *int64
+	milliseconds = new(int64)
 	if expire != "" {
 		if getLongLongFromObjectOrReply(c, expire, milliseconds, "") != REDIS_OK {
 			return
@@ -95,14 +94,14 @@ func setGenericCommand(c *redisClient, flags int, key string, val string, expire
 		}
 	}
 
-	if (flags&REDIS_SET_NX > 0 && lookupKeyWrite(c.db, key) != nil) ||
-		(flags&REDIS_SET_XX > 0 && lookupKeyWrite(c.db, key) == nil) {
+	if (flags&REDIS_SET_NX > 0 && *lookupKeyWrite(c.db, key) != nil) ||
+		(flags&REDIS_SET_XX > 0 && *lookupKeyWrite(c.db, key) == nil) {
 		addReply(c, shared.nullbulk)
 		return
 	}
 
 	if expire != "" {
-		c.db.dict[key] = time.Now().UnixMilli() + *milliseconds
+		c.db.expires[key] = time.Now().UnixMilli() + *milliseconds
 	}
 	c.db.dict[key] = val
 
@@ -128,11 +127,12 @@ func getCommand(c *redisClient) {
 	getGenericCommand(c)
 }
 
-func getGenericCommand(c *redisClient) {
-	i, e := c.db.dict[c.argv[1]]
-	if !e {
-		addReply(c, shared.nullbulk)
-		return
+func getGenericCommand(c *redisClient) int {
+	o := lookupKeyReadOrReply(c, c.argv[1], &shared.nullbulk)
+	if *o == nil {
+		return REDIS_OK
 	}
-	addReply(c, "$"+strconv.Itoa(len(i.(string)))+shared.crlf+i.(string)+shared.crlf)
+	val := (*o).(string)
+	addReplyBulk(c, &val)
+	return REDIS_OK
 }

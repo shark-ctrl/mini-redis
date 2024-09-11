@@ -38,7 +38,21 @@ func deDelete(db *redisDb, key string) {
 	delete(db.dict, key)
 }
 
+func lookupKeyRead(db *redisDb, key string) *interface{} {
+	expireIfNeeded(db, key)
+	val := lookupKey(db, key)
+	return val
+}
+
 func lookupKey(db *redisDb, key string) *interface{} {
 	val := db.dict[key]
 	return &val
+}
+
+func lookupKeyReadOrReply(c *redisClient, key string, reply *string) *interface{} {
+	o := lookupKeyRead(c.db, key)
+	if *o == nil {
+		addReply(c, *reply)
+	}
+	return o
 }

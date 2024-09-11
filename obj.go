@@ -12,7 +12,7 @@ func getLongLongFromObjectOrReply(c *redisClient, expire string, target *int64, 
 	var value int64
 	value, err := strconv.ParseInt(expire, 10, 64)
 	if err != nil {
-		addReply(c, "invalid value")
+		addReply(c, shared.err)
 		return REDIS_ERR
 	}
 	if value < 0 {
