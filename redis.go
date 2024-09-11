@@ -163,14 +163,16 @@ func populateCommandTable() {
 }
 
 func processCommand(c *redisClient) {
+	//check the command table to see if the specified command exists.
 	redisCommand, exists := server.commands[strings.ToUpper(c.argv[0])]
 	if !exists {
 		c.conn.Write([]byte("-ERR unknown command\r\n"))
 		return
 	}
+	//assign the function of the command to "cmd".
 	c.cmd = redisCommand
 	c.lastCmd = redisCommand
-
+	//invoke "call" to pass the parameters to the function pointed to by "cmd" for processing.
 	call(c, REDIS_CALL_FULL)
 }
 
