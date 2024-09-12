@@ -58,6 +58,7 @@ func main() {
 	}(&server)
 
 	go func(s *redisServer) {
+		//retrieve the Redis client from "commandCh" and call "processCommand" to handle the instructions parsed from the array.
 		for redisClient := range s.commandCh {
 			processCommand(&redisClient)
 		}
