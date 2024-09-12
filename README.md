@@ -51,18 +51,20 @@ PONG
 - 解析`redis-cli`通过`RESP`协议发送的命令请求。
 - 支持客户端键入command指令并回复当前服务端支持的指令集。
 - 支持客户端键入PING指令感知mini-redis是否可用。
-- 2024-9-11(最新进度):初步完成了GET、SET指令指令解析和常规用法
+- 完成GET、SET指令指令解析和常规用法
 
 
 后续开发计划:
 
-+ [ ] 字典、列表、有序集合、字符串等数据结构
-+ [ ] 字符串常规`GET`和`SET`指令
-+ [ ] 列表有所操作指令
++ [ ] 字典、列表、有序集合、字符串等数据结构开发
++ [ ] 字符串常规`GET`指令开发调测
++ [ ] 字符串`SET`指令开发调测
++ [ ] 列表操作BLPOP、BRPOP、LINDEX、LINSERT、LLEN、LPOP、LPUSH、LRANGE、LREM、LSET、RPOP
 + [ ] 字典所有操作指令
 + [ ] 有序集合所有操作指令
 + [ ] `AOF`持久化和重载机制
 + [ ] `LRU`缓存置换算法
++ [ ] 性能压测
 
 
 ## 如何阅读源码
@@ -71,6 +73,9 @@ PONG
 
 
 来聊聊我用go手写redis这件事:<https://mp.weixin.qq.com/s?__biz=MzkwODYyNTM2MQ==&mid=2247486169&idx=1&sn=9b562eca113fbbe02d07f9ae2ccf0e79&chksm=c0c65e67f7b1d77166b7ff9a7a0403fb02d39ae1a111a73e12f7f1cdc3e79e91b2d116a5908a#rd>
+
+mini-redis如何解析处理客户端请求
+:<https://mp.weixin.qq.com/s?__biz=MzkwODYyNTM2MQ==&mid=2247486258&idx=1&sn=5a1bfffc075881e32cc247d6a76a88fe&chksm=c0c65f8cf7b1d69a91c1a9b3c5d15467e820db886e5e60ba059ccb3861b21d5e57ee8fc9b13d#rd>
 
 
 ## 关于我
