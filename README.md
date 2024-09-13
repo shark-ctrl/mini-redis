@@ -57,8 +57,8 @@ PONG
 后续开发计划:
 
 + [ ] 字典、列表、有序集合、字符串等数据结构开发
-+ [ ] 字符串常规`GET`指令开发调测
-+ [ ] 字符串`SET`指令开发调测
++ [x] 字符串常规`GET`指令开发调测
++ [x] 字符串`SET`指令开发调测
 + [ ] 列表操作BLPOP、BRPOP、LINDEX、LINSERT、LLEN、LPOP、LPUSH、LRANGE、LREM、LSET、RPOP
 + [ ] 字典所有操作指令
 + [ ] 有序集合所有操作指令
@@ -77,6 +77,7 @@ PONG
 mini-redis如何解析处理客户端请求
 :<https://mp.weixin.qq.com/s?__biz=MzkwODYyNTM2MQ==&mid=2247486258&idx=1&sn=5a1bfffc075881e32cc247d6a76a88fe&chksm=c0c65f8cf7b1d69a91c1a9b3c5d15467e820db886e5e60ba059ccb3861b21d5e57ee8fc9b13d#rd>
 
+实现mini-redis字符串操作:<https://mp.weixin.qq.com/s?__biz=MzkwODYyNTM2MQ==&mid=2247486268&idx=1&sn=003ba535c5a78c88cb4a15859edcfdf5&chksm=c0c65f82f7b1d69406832650746f93de3ef6b3b8a77badcf0f9924e1e052369990b4d233f10f#rd>
 
 ## 关于我
 
