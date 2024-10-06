@@ -59,6 +59,13 @@ const (
 	REDIS_ENCODING_INTSET     = 6 /* Encoded as intset */
 	REDIS_ENCODING_SKIPLIST   = 7 /* Encoded as skiplist */
 	REDIS_ENCODING_EMBSTR     = 8 /* Embedded sds string encoding */
+
+	/* List related stuff */
+	REDIS_HEAD = 0
+	REDIS_TAIL = 1
+
+	REDIS_SHARED_INTEGERS    = 10000
+	REDIS_SHARED_BULKHDR_LEN = 32
 )
 
 type redisServer struct {
@@ -82,8 +89,8 @@ type redisServer struct {
 type robj = redisObject
 
 type redisObject struct {
-	robjType uint
-	encoding uint
+	robjType int
+	encoding int
 	ptr      *interface{}
 }
 

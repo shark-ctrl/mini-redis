@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -20,25 +21,34 @@ var redisCommandTable = []redisCommand{
 	{name: "PING", proc: pingCommand, sflag: "rtF", flag: 0},
 	{name: "SET", proc: setCommand, sflag: "rtF", flag: 0},
 	{name: "GET", proc: getCommand, sflag: "rtF", flag: 0},
+	{name: "RPUSH", proc: rpushCommand, sflag: "wmF", flag: 0},
+	{name: "LRANGE", proc: lrangeCommand, sflag: "r", flag: 0},
+	{name: "LINDEX", proc: lindexCommand, sflag: "r", flag: 0},
+	{name: "LPOP", proc: lpopCommand, sflag: "wF", flag: 0},
 }
 var shared sharedObjectsStruct
 
 type sharedObjectsStruct struct {
-	crlf      string
-	ok        string
-	err       string
-	pong      string
-	syntaxerr string
-	nullbulk  string
+	crlf         *string
+	ok           *string
+	err          *string
+	pong         *string
+	syntaxerr    *string
+	nullbulk     *string
+	wrongtypeerr *string
+	czero        *string
+	cone         *string
+	integers     [REDIS_SHARED_INTEGERS]*robj
+	bulkhdr      [REDIS_SHARED_BULKHDR_LEN]*robj
 }
 
 func commandCommand(c *redisClient) {
-	reply := "*" + strconv.Itoa(len(server.commands)) + shared.crlf
+	reply := "*" + strconv.Itoa(len(server.commands)) + *shared.crlf
 	for _, command := range server.commands {
-		reply += "$" + strconv.Itoa(len(command.name)) + shared.crlf + command.name + shared.crlf
+		reply += "$" + strconv.Itoa(len(command.name)) + *shared.crlf + command.name + *shared.crlf
 	}
 
-	addReply(c, reply)
+	addReply(c, &reply)
 }
 
 func pingCommand(c *redisClient) {
@@ -119,13 +129,38 @@ func setGenericCommand(c *redisClient, flags int, key *robj, val *robj, expire s
 }
 
 func createSharedObjects() {
+	crlf := "\r\n"
+	ok := "+OK\r\n"
+	err := "-ERR\r\n"
+	pong := "+PONG\r\n"
+	syntaxerr := "-ERR syntax error\r\n"
+	nullbulk := "$-1\r\n"
+	wrongtypeerr := "-WRONGTYPE Operation against a key holding the wrong kind of value\r\n"
+	czero := ":0\r\n"
+	cone := ":1\r\n"
+
 	shared = sharedObjectsStruct{
-		crlf:      "\r\n",
-		ok:        "+OK\r\n",
-		err:       "-ERR\r\n",
-		pong:      "+PONG\r\n",
-		syntaxerr: "-ERR syntax error\r\n",
-		nullbulk:  "$-1\r\n",
+		crlf:         &crlf,
+		ok:           &ok,
+		err:          &err,
+		pong:         &pong,
+		syntaxerr:    &syntaxerr,
+		nullbulk:     &nullbulk,
+		wrongtypeerr: &wrongtypeerr,
+		czero:        &czero,
+		cone:         &cone,
+	}
+
+	for i := 0; i < REDIS_SHARED_INTEGERS; i++ {
+		num := interface{}(i)
+		shared.integers[i] = createObject(REDIS_STRING, &num)
+		shared.integers[i].encoding = REDIS_ENCODING_INT
+	}
+
+	for i := 0; i < REDIS_SHARED_BULKHDR_LEN; i++ {
+		s := "*" + strconv.Itoa(i) + "\r\n"
+		intf := interface{}(s)
+		shared.bulkhdr[i] = createObject(REDIS_STRING, &intf)
 	}
 }
 
@@ -139,12 +174,148 @@ func getCommand(c *redisClient) {
 
 func getGenericCommand(c *redisClient) int {
 	//check if the key exists, and if it does not, return a null bulk response from the constant values.
-	o := lookupKeyReadOrReply(c, c.argv[1], &shared.nullbulk)
+	o := lookupKeyReadOrReply(c, c.argv[1], shared.nullbulk)
 	if *o == nil {
 		return REDIS_OK
 	}
 	//return the value to the client if it exists.
-	val := (*o).(string)
+	val := (*o).(robj)
 	addReplyBulk(c, &val)
 	return REDIS_OK
+}
+
+func rpushCommand(c *redisClient) {
+	pushGenericCommand(c, REDIS_TAIL)
+}
+
+func pushGenericCommand(c *redisClient, where int) {
+	i := lookupKeyWrite(c.db, c.argv[1])
+	lobj := (*i).(robj)
+	if i != nil && lobj.encoding != REDIS_ENCODING_LINKEDLIST {
+		addReply(c, shared.wrongtypeerr)
+		return
+	}
+	var j uint64
+	for j = 2; j < c.argc; j++ {
+		c.argv[j] = tryObjectEncoding(c.argv[j])
+		if i == nil {
+			lobj = *createListObject()
+			dbAdd(c.db, c.argv[1], &lobj)
+		}
+		listTypePush(&lobj, c.argv[j], REDIS_TAIL)
+	}
+
+	addReplyLongLong(c, (*lobj.ptr).(list).len)
+}
+
+func lrangeCommand(c *redisClient) {
+	var o *robj
+	var start int64
+	var end int64
+	var llen int64
+	var rangelen int64
+
+	if !getLongFromObjectOrReply(c, c.argv[2], &start, nil) ||
+		!getLongFromObjectOrReply(c, c.argv[3], &end, nil) {
+		return
+	}
+
+	val := lookupKeyReadOrReply(c, c.argv[1], shared.wrongtypeerr)
+	r := (*val).(robj)
+	o = &r
+	if o == nil || !checkType(c, o, REDIS_LIST) {
+		return
+	}
+
+	llen = (*r.ptr).(list).len
+	if start < 0 {
+		start += llen
+	}
+
+	if start < 0 {
+		start += llen
+	}
+
+	if end < 0 {
+		end += llen
+	}
+
+	if start < 0 {
+		start = 0
+	}
+
+	if start < llen || start > end {
+		addReplyError(c, shared.wrongtypeerr)
+		return
+	}
+
+	if end > llen {
+		end = llen - 1
+	}
+
+	rangelen = end - start + 1
+	addReplyMultiBulkLen(c, rangelen)
+
+	if o.encoding == REDIS_ENCODING_ZIPLIST {
+		//todo
+	} else if o.encoding == REDIS_ENCODING_LINKEDLIST {
+		lobj := (*r.ptr).(list)
+		node := listIndex(&lobj, start)
+		for rangelen > 0 {
+			rObj := (*node.value).(robj)
+			addReplyBulk(c, &rObj)
+			rangelen--
+		}
+
+	} else {
+		log.Panic("List encoding is not LINKEDLIST nor ZIPLIST!")
+	}
+
+}
+
+func lindexCommand(c *redisClient) {
+	i := lookupKeyReadOrReply(c, c.argv[1], shared.nullbulk)
+	r := (*i).(robj)
+	if i == nil || checkType(c, &r, REDIS_LIST) {
+		return
+	}
+
+	if r.encoding == REDIS_ENCODING_ZIPLIST {
+		//todo
+	} else if r.encoding == REDIS_ENCODING_LINKEDLIST {
+		lobj := (*r.ptr).(list)
+		ln := listIndex(&lobj, (*c.argv[1].ptr).(int64))
+
+		if ln != nil {
+			value := (*ln.value).(robj)
+			addReplyBulk(c, &value)
+		} else {
+			addReply(c, shared.nullbulk)
+		}
+	} else {
+		log.Panic("Unknown list encoding")
+	}
+
+}
+
+func lpopCommand(c *redisClient) {
+	popGenericCommand(c, REDIS_HEAD)
+}
+
+func popGenericCommand(c *redisClient, where int) {
+	o := lookupKeyWrite(c.db, c.argv[1])
+	r := (*o).(robj)
+	if o == nil || !checkType(c, &r, REDIS_LIST) {
+		return
+	}
+
+	value := listTypePop(&r, where)
+	if value == nil {
+		addReply(c, shared.nullbulk)
+	} else {
+		addReplyBulk(c, value)
+		if listTypeLength(&r) == 0 {
+			dbDelete(c.db, c.argv[1])
+		}
+	}
 }

@@ -8,6 +8,16 @@ type redisDb struct {
 	id      int
 }
 
+func lookupKeyWriteOrReply(c *redisClient, key *robj, reply *robj) *robj {
+	o := lookupKeyWrite(c.db, key)
+	if o == nil {
+		s := (*reply.ptr).(string)
+		addReply(c, &s)
+	}
+	r := (*o).(robj)
+	return &r
+}
+
 func lookupKeyWrite(db *redisDb, key *robj) *interface{} {
 	//check if the key has expired, and if so, delete it.
 	expireIfNeeded(db, key)
@@ -57,7 +67,16 @@ func lookupKeyReadOrReply(c *redisClient, key *robj, reply *string) *interface{}
 	//check if the key has expired to decide whether to delete the key from the dictionary, then query the dictionary for the result and return it.
 	o := lookupKeyRead(c.db, key)
 	if *o == nil {
-		addReply(c, *reply)
+		addReply(c, reply)
 	}
 	return o
+}
+
+func dbAdd(db *redisDb, key *robj, val *robj) {
+	db.dict[(*key.ptr).(string)] = val
+}
+
+func dbDelete(db *redisDb, key *robj) int64 {
+	delete(db.dict, (*key.ptr).(string))
+	return 1
 }
