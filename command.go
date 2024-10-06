@@ -52,12 +52,14 @@ func setCommand(c *redisClient) {
 	flags := REDIS_SET_NO_FLAGS
 	//traverse the arguments after setting the key-value pair in a set.
 	for j = 3; j < c.argc; j++ {
-		a := c.argv[j]
+		ptr := c.argv[j].ptr
+		a := (*ptr).(string)
 		var next string
 		if j == c.argc-1 {
 			next = ""
 		} else {
-			next = c.argv[j+1]
+			nextPtr := c.argv[j+1].ptr
+			next = (*nextPtr).(string)
 		}
 		// if the string "nx" is included, mark through bitwise operations that the current key can only be set when it does not exist.
 		if strings.ToLower(a) == "nx" {
@@ -81,7 +83,7 @@ func setCommand(c *redisClient) {
 	setGenericCommand(c, flags, c.argv[1], c.argv[2], expire, unit, "", "")
 }
 
-func setGenericCommand(c *redisClient, flags int, key string, val string, expire string, unit int, ok_reply string, abort_reply string) {
+func setGenericCommand(c *redisClient, flags int, key *robj, val *robj, expire string, unit int, ok_reply string, abort_reply string) {
 	//initialize a pointer to record the expiration time in milliseconds.
 	var milliseconds *int64
 	milliseconds = new(int64)
@@ -108,10 +110,10 @@ func setGenericCommand(c *redisClient, flags int, key string, val string, expire
 	//if `expire` is not empty, add the converted value to the current time to obtain the expiration time. Then,
 	//use the passed key as the key and the expiration time as the value to store in the `expires` dictionary.
 	if expire != "" {
-		c.db.expires[key] = time.Now().UnixMilli() + *milliseconds
+		c.db.expires[(*key.ptr).(string)] = time.Now().UnixMilli() + *milliseconds
 	}
 	//store the key-value pair in a dictionary.
-	c.db.dict[key] = val
+	c.db.dict[(*key.ptr).(string)] = val
 
 	addReply(c, shared.ok)
 }

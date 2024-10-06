@@ -39,6 +39,26 @@ const (
 	REDIS_SET_XX       = (1 << 1) /* Set if key exists. */
 
 	REDIS_DEFAULT_DBNUM = 16
+
+	/* Object types */
+	REDIS_STRING = 0
+	REDIS_LIST   = 1
+	REDIS_SET    = 2
+	REDIS_ZSET   = 3
+	REDIS_HASH   = 4
+
+	/* Objects encoding. Some kind of objects like Strings and Hashes can be
+	 * internally represented in multiple ways. The 'encoding' field of the object
+	 * is set to one of this fields for this object. */
+	REDIS_ENCODING_RAW        = 0 /* Raw representation */
+	REDIS_ENCODING_INT        = 1 /* Encoded as integer */
+	REDIS_ENCODING_HT         = 2 /* Encoded as hash table */
+	REDIS_ENCODING_ZIPMAP     = 3 /* Encoded as zipmap */
+	REDIS_ENCODING_LINKEDLIST = 4 /* Encoded as regular linked list */
+	REDIS_ENCODING_ZIPLIST    = 5 /* Encoded as ziplist */
+	REDIS_ENCODING_INTSET     = 6 /* Encoded as intset */
+	REDIS_ENCODING_SKIPLIST   = 7 /* Encoded as skiplist */
+	REDIS_ENCODING_EMBSTR     = 8 /* Embedded sds string encoding */
 )
 
 type redisServer struct {
@@ -57,6 +77,14 @@ type redisServer struct {
 	commands map[string]redisCommand
 	db       []redisDb
 	dbnum    int
+}
+
+type robj = redisObject
+
+type redisObject struct {
+	robjType uint
+	encoding uint
+	ptr      *interface{}
 }
 
 func initServer() {
@@ -97,7 +125,7 @@ func acceptTcpHandler(conn net.Conn) {
 }
 
 func createClient(conn net.Conn) *redisClient {
-	c := redisClient{conn: conn, argc: 0, argv: make([]string, 0), multibulklen: -1}
+	c := redisClient{conn: conn, argc: 0, argv: make([]*robj, 0), multibulklen: -1}
 	selectDb(&c, 0)
 	return &c
 }
@@ -164,7 +192,8 @@ func populateCommandTable() {
 
 func processCommand(c *redisClient) {
 	//check the command table to see if the specified command exists.
-	redisCommand, exists := server.commands[strings.ToUpper(c.argv[0])]
+	ptr := c.argv[0].ptr
+	redisCommand, exists := server.commands[strings.ToUpper((*ptr).(string))]
 	if !exists {
 		c.conn.Write([]byte("-ERR unknown command\r\n"))
 		return

@@ -20,7 +20,7 @@ type redisClient struct {
 	//redis client connection info
 	conn         net.Conn
 	argc         uint64
-	argv         []string
+	argv         []*robj
 	multibulklen int64
 	reqType      int
 	queryBuf     []byte
@@ -66,7 +66,7 @@ func processInputBuffer(c *redisClient, reader *bufio.Reader, CloseClientCh chan
 				continue
 			}
 			//based on the parsed length, initialize the size of the array.
-			c.argv = make([]string, c.multibulklen)
+			c.argv = make([]*robj, c.multibulklen)
 			//based on the length indicated by "*", start parsing the string.
 			e := processMultibulkBuffer(c, reader, CloseClientCh)
 			if e != nil {
@@ -127,7 +127,8 @@ func processMultibulkBuffer(c *redisClient, reader *bufio.Reader, CloseClientCh 
 				return errors.New("ERR unknown command")
 			}
 			//parse and extract a string of specified length based on the value of "ll", store it in "argv", and then increment "argc".
-			c.argv[c.argc] = string(c.queryBuf[0 : len(c.queryBuf)-2])
+			str := string(c.queryBuf[0 : len(c.queryBuf)-2])
+			c.argv[c.argc] = createStringObject(&str, len(str))
 			c.argc++
 		} else if c.queryBuf[0] != '$' && ll < 0 { //invalid str
 			return errors.New("ERR unknown command")
