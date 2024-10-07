@@ -64,9 +64,10 @@ func getLongFromObjectOrReply(c *redisClient, o *robj, target *int64, msg *strin
 	value, err := strconv.ParseInt((*o.ptr).(string), 10, 64)
 	if err != nil {
 		if msg != nil {
-			addReplyError(c, *msg)
+			addReplyError(c, msg)
 		} else {
-			addReplyError(c, "value is not an integer or out of range")
+			*msg = "value is not an integer or out of range"
+			addReplyError(c, msg)
 		}
 		return false
 	}
@@ -82,7 +83,7 @@ func checkType(c *redisClient, o *robj, rType int) bool {
 	return true
 }
 
-func getLongLongFromObjectOrReply(c *redisClient, expire string, target *int64, msg string) int {
+func getLongLongFromObjectOrReply(c *redisClient, expire string, target *int64, msg *string) int {
 	var value int64
 	value, err := strconv.ParseInt(expire, 10, 64)
 	if err != nil {
@@ -90,7 +91,8 @@ func getLongLongFromObjectOrReply(c *redisClient, expire string, target *int64, 
 		return REDIS_ERR
 	}
 	if value < 0 {
-		addReplyError(c, "value is not an integer or out of range")
+		*msg = "value is not an integer or out of range"
+		addReplyError(c, msg)
 		return REDIS_ERR
 	}
 	*target = value

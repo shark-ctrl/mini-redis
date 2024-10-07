@@ -68,8 +68,8 @@ func processInputBuffer(c *redisClient, reader *bufio.Reader, CloseClientCh chan
 			//based on the parsed length, initialize the size of the array.
 			c.argv = make([]*robj, c.multibulklen)
 			//based on the length indicated by "*", start parsing the string.
-			e := processMultibulkBuffer(c, reader, CloseClientCh)
-			if e != nil {
+			res, e := processMultibulkBuffer(c, reader, CloseClientCh)
+			if res == REDIS_ERR && e != nil {
 				_, _ = c.conn.Write([]byte("-ERR unknown command\r\n"))
 				log.Println("ERR unknown command")
 				continue
@@ -91,7 +91,7 @@ func processInputBuffer(c *redisClient, reader *bufio.Reader, CloseClientCh chan
 
 }
 
-func processMultibulkBuffer(c *redisClient, reader *bufio.Reader, CloseClientCh chan redisClient) error {
+func processMultibulkBuffer(c *redisClient, reader *bufio.Reader, CloseClientCh chan redisClient) (int, error) {
 	c.argc = 0
 	//initialize "ll" to record the length following each "$", then fetch the string based on this length.
 	ll := int64(-1)
@@ -104,38 +104,38 @@ func processMultibulkBuffer(c *redisClient, reader *bufio.Reader, CloseClientCh 
 			CloseClientCh <- *c
 			break
 		} else if e != nil {
-			return e
+			return REDIS_ERR, e
 		}
 
 		if len(c.queryBuf) == 0 || !(len(c.queryBuf)-2 >= 0 && c.queryBuf[len(c.queryBuf)-2] == '\r') {
-			return errors.New("ERR unknown command")
+			return REDIS_ERR, errors.New("ERR unknown command")
 		}
 		//if a "$" is intercepted in this line, store the following numerical value in "ll".
 		if c.queryBuf[0] == '$' {
 			ll, e = strconv.ParseInt(string(c.queryBuf[1:len(c.queryBuf)-2]), 10, 32)
 			if e != nil || ll <= 0 {
-				return e
+				return REDIS_ERR, e
 			}
 			strBytes, e := reader.ReadBytes('\n')
 			c.queryBuf = strBytes
 
 			if e != nil {
-				return e
+				return REDIS_ERR, e
 			}
 
 			if len(c.queryBuf) == 0 || int64(len(c.queryBuf))-2 != ll {
-				return errors.New("ERR unknown command")
+				return REDIS_ERR, errors.New("ERR unknown command")
 			}
 			//parse and extract a string of specified length based on the value of "ll", store it in "argv", and then increment "argc".
 			str := string(c.queryBuf[0 : len(c.queryBuf)-2])
 			c.argv[c.argc] = createStringObject(&str, len(str))
 			c.argc++
 		} else if c.queryBuf[0] != '$' && ll < 0 { //invalid str
-			return errors.New("ERR unknown command")
+			return REDIS_ERR, errors.New("ERR unknown command")
 		}
 	}
 
-	return nil
+	return REDIS_OK, nil
 }
 
 func (c redisClient) string() string {

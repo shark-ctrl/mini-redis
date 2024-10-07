@@ -99,7 +99,7 @@ func setGenericCommand(c *redisClient, flags int, key *robj, val *robj, expire s
 	milliseconds = new(int64)
 	//if `expire` is not empty, parse it as an int64 and store it in `milliseconds`.
 	if expire != "" {
-		if getLongLongFromObjectOrReply(c, expire, milliseconds, "") != REDIS_OK {
+		if getLongLongFromObjectOrReply(c, expire, milliseconds, nil) != REDIS_OK {
 			return
 		}
 
@@ -179,8 +179,8 @@ func getGenericCommand(c *redisClient) int {
 		return REDIS_OK
 	}
 	//return the value to the client if it exists.
-	val := (*o).(robj)
-	addReplyBulk(c, &val)
+	val := (*o).(*robj)
+	addReplyBulk(c, val)
 	return REDIS_OK
 }
 
