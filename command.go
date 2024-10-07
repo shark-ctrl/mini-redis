@@ -29,17 +29,18 @@ var redisCommandTable = []redisCommand{
 var shared sharedObjectsStruct
 
 type sharedObjectsStruct struct {
-	crlf         *string
-	ok           *string
-	err          *string
-	pong         *string
-	syntaxerr    *string
-	nullbulk     *string
-	wrongtypeerr *string
-	czero        *string
-	cone         *string
-	integers     [REDIS_SHARED_INTEGERS]*robj
-	bulkhdr      [REDIS_SHARED_BULKHDR_LEN]*robj
+	crlf           *string
+	ok             *string
+	err            *string
+	pong           *string
+	syntaxerr      *string
+	nullbulk       *string
+	wrongtypeerr   *string
+	czero          *string
+	cone           *string
+	emptymultibulk *string
+	integers       [REDIS_SHARED_INTEGERS]*robj
+	bulkhdr        [REDIS_SHARED_BULKHDR_LEN]*robj
 }
 
 func commandCommand(c *redisClient) {
@@ -138,17 +139,19 @@ func createSharedObjects() {
 	wrongtypeerr := "-WRONGTYPE Operation against a key holding the wrong kind of value\r\n"
 	czero := ":0\r\n"
 	cone := ":1\r\n"
+	emptymultibulk := "*0\r\n"
 
 	shared = sharedObjectsStruct{
-		crlf:         &crlf,
-		ok:           &ok,
-		err:          &err,
-		pong:         &pong,
-		syntaxerr:    &syntaxerr,
-		nullbulk:     &nullbulk,
-		wrongtypeerr: &wrongtypeerr,
-		czero:        &czero,
-		cone:         &cone,
+		crlf:           &crlf,
+		ok:             &ok,
+		err:            &err,
+		pong:           &pong,
+		syntaxerr:      &syntaxerr,
+		nullbulk:       &nullbulk,
+		wrongtypeerr:   &wrongtypeerr,
+		czero:          &czero,
+		cone:           &cone,
+		emptymultibulk: &emptymultibulk,
 	}
 
 	for i := 0; i < REDIS_SHARED_INTEGERS; i++ {
@@ -190,22 +193,25 @@ func rpushCommand(c *redisClient) {
 
 func pushGenericCommand(c *redisClient, where int) {
 	i := lookupKeyWrite(c.db, c.argv[1])
-	lobj := (*i).(robj)
-	if i != nil && lobj.encoding != REDIS_ENCODING_LINKEDLIST {
+	var lobj *robj
+	if *i != nil && (*i).(*robj).encoding != REDIS_ENCODING_LINKEDLIST {
 		addReply(c, shared.wrongtypeerr)
 		return
+	} else if *i != nil {
+		lobj = (*i).(*robj)
 	}
+
 	var j uint64
 	for j = 2; j < c.argc; j++ {
 		c.argv[j] = tryObjectEncoding(c.argv[j])
-		if i == nil {
-			lobj = *createListObject()
-			dbAdd(c.db, c.argv[1], &lobj)
+		if lobj == nil {
+			lobj = createListObject()
+			dbAdd(c.db, c.argv[1], lobj)
 		}
-		listTypePush(&lobj, c.argv[j], REDIS_TAIL)
+		listTypePush(lobj, c.argv[j], REDIS_TAIL)
 	}
 
-	addReplyLongLong(c, (*lobj.ptr).(list).len)
+	addReplyLongLong(c, (*lobj.ptr).(*list).len)
 }
 
 func lrangeCommand(c *redisClient) {
@@ -221,13 +227,13 @@ func lrangeCommand(c *redisClient) {
 	}
 
 	val := lookupKeyReadOrReply(c, c.argv[1], shared.wrongtypeerr)
-	r := (*val).(robj)
-	o = &r
+	o = (*val).(*robj)
+
 	if o == nil || !checkType(c, o, REDIS_LIST) {
 		return
 	}
 
-	llen = (*r.ptr).(list).len
+	llen = (*o.ptr).(*list).len
 	if start < 0 {
 		start += llen
 	}
@@ -244,8 +250,8 @@ func lrangeCommand(c *redisClient) {
 		start = 0
 	}
 
-	if start < llen || start > end {
-		addReplyError(c, shared.wrongtypeerr)
+	if start >= llen || start > end {
+		addReplyError(c, shared.emptymultibulk)
 		return
 	}
 
@@ -259,11 +265,12 @@ func lrangeCommand(c *redisClient) {
 	if o.encoding == REDIS_ENCODING_ZIPLIST {
 		//todo
 	} else if o.encoding == REDIS_ENCODING_LINKEDLIST {
-		lobj := (*r.ptr).(list)
-		node := listIndex(&lobj, start)
+		lobj := (*o.ptr).(*list)
+		node := listIndex(lobj, start)
 		for rangelen > 0 {
-			rObj := (*node.value).(robj)
-			addReplyBulk(c, &rObj)
+			rObj := (*node.value).(*robj)
+			addReplyBulk(c, rObj)
+			node = node.next
 			rangelen--
 		}
 
@@ -275,20 +282,22 @@ func lrangeCommand(c *redisClient) {
 
 func lindexCommand(c *redisClient) {
 	i := lookupKeyReadOrReply(c, c.argv[1], shared.nullbulk)
-	r := (*i).(robj)
-	if i == nil || checkType(c, &r, REDIS_LIST) {
+	r := (*i).(*robj)
+	if *i == nil || checkType(c, r, REDIS_LIST) {
 		return
 	}
 
 	if r.encoding == REDIS_ENCODING_ZIPLIST {
 		//todo
 	} else if r.encoding == REDIS_ENCODING_LINKEDLIST {
-		lobj := (*r.ptr).(list)
-		ln := listIndex(&lobj, (*c.argv[1].ptr).(int64))
+		lobj := (*r.ptr).(*list)
+		s := (*c.argv[2].ptr).(string)
+		idx, _ := strconv.ParseInt(s, 10, 64)
+		ln := listIndex(lobj, idx)
 
 		if ln != nil {
-			value := (*ln.value).(robj)
-			addReplyBulk(c, &value)
+			value := (*ln.value).(*robj)
+			addReplyBulk(c, value)
 		} else {
 			addReply(c, shared.nullbulk)
 		}
@@ -303,18 +312,18 @@ func lpopCommand(c *redisClient) {
 }
 
 func popGenericCommand(c *redisClient, where int) {
-	o := lookupKeyWrite(c.db, c.argv[1])
-	r := (*o).(robj)
-	if o == nil || !checkType(c, &r, REDIS_LIST) {
+	o := lookupKeyReadOrReply(c, c.argv[1], shared.nullbulk)
+	r := (*o).(*robj)
+	if o == nil || checkType(c, r, REDIS_LIST) {
 		return
 	}
 
-	value := listTypePop(&r, where)
+	value := listTypePop(r, where)
 	if value == nil {
 		addReply(c, shared.nullbulk)
 	} else {
 		addReplyBulk(c, value)
-		if listTypeLength(&r) == 0 {
+		if listTypeLength(r) == 0 {
 			dbDelete(c.db, c.argv[1])
 		}
 	}

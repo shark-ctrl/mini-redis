@@ -9,11 +9,12 @@ func listTypePush(subject *robj, value *robj, where int) {
 	if subject.encoding == REDIS_ENCODING_ZIPLIST {
 		//todo
 	} else if subject.encoding == REDIS_ENCODING_LINKEDLIST {
-		lobj := (*subject.ptr).(list)
+		lobj := (*subject.ptr).(*list)
+		node := interface{}(value)
 		if where == REDIS_HEAD {
-			listAddNodeHead(&lobj, value.ptr)
+			listAddNodeHead(lobj, &node)
 		} else {
-			listAddNodeTail(&lobj, value.ptr)
+			listAddNodeTail(lobj, &node)
 		}
 	} else {
 		log.Panic("Unknown list encoding")
@@ -26,7 +27,7 @@ func listTypeLength(subject *robj) int64 {
 		//todo
 		return 0
 	} else if subject.encoding == REDIS_ENCODING_LINKEDLIST {
-		lobj := (*subject.ptr).(list)
+		lobj := (*subject.ptr).(*list)
 		return lobj.len
 	} else {
 		log.Panic("Unknown list encoding")
@@ -39,16 +40,15 @@ func listTypePop(subject *robj, where int) *robj {
 	if subject.encoding == REDIS_ENCODING_ZIPLIST {
 		//todo
 	} else if subject.encoding == REDIS_ENCODING_LINKEDLIST {
-		lobj := (*subject.ptr).(list)
+		lobj := (*subject.ptr).(*list)
 		var ln *listNode
 		if where == REDIS_HEAD {
 			ln = lobj.head
 		} else {
 			ln = lobj.tail
 		}
-		v := (*ln.value).(robj)
-		value = &v
-		listDelNode(&lobj, ln)
+		value = (*ln.value).(*robj)
+		listDelNode(lobj, ln)
 	} else {
 		log.Panic("Unknown list encoding")
 	}

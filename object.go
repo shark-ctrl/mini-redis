@@ -1,6 +1,7 @@
 package main
 
 import (
+	"math"
 	"strconv"
 )
 
@@ -62,7 +63,14 @@ func createListObject() *robj {
 
 func getLongFromObjectOrReply(c *redisClient, o *robj, target *int64, msg *string) bool {
 	value, err := strconv.ParseInt((*o.ptr).(string), 10, 64)
+
 	if err != nil {
+		errMsg := "value is not an integer or out of range"
+		addReplyError(c, &errMsg)
+		return false
+	}
+
+	if value < math.MinInt64 || value > math.MaxInt64 {
 		if msg != nil {
 			addReplyError(c, msg)
 		} else {
@@ -78,9 +86,9 @@ func getLongFromObjectOrReply(c *redisClient, o *robj, target *int64, msg *strin
 func checkType(c *redisClient, o *robj, rType int) bool {
 	if o.robjType != rType {
 		addReply(c, shared.wrongtypeerr)
-		return false
+		return true
 	}
-	return true
+	return false
 }
 
 func getLongLongFromObjectOrReply(c *redisClient, expire string, target *int64, msg *string) int {
