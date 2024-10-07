@@ -28,14 +28,21 @@ func tryObjectEncoding(o *robj) *robj {
 	var value int64
 	var s string
 	var sLen int
-
+	//get string value and length
 	s = (*o.ptr).(string)
 	sLen = len(s)
-
+	/**
+	If it can be converted into an integer and is between 0 and 10000,
+	it is obtained from the constant pool.
+	*/
 	if sLen < 21 && string2l(&s, sLen, &value) {
 		if value >= 0 && value < REDIS_SHARED_INTEGERS {
 			return shared.integers[value]
 		} else {
+			/**
+			If it is not within the scope of constant pool,
+			it will be manually converted into an object of integer encoding type.
+			*/
 			o.encoding = REDIS_ENCODING_INT
 			num := interface{}(value)
 			o.ptr = &num

@@ -188,29 +188,45 @@ func getGenericCommand(c *redisClient) int {
 }
 
 func rpushCommand(c *redisClient) {
+	/**
+	pass in the REDIS_TAIL flag to indicate that
+	the current element should be appended to the tail of the list.
+	*/
 	pushGenericCommand(c, REDIS_TAIL)
 }
 
 func pushGenericCommand(c *redisClient, where int) {
+	//check if the corresponding key exists.
 	i := lookupKeyWrite(c.db, c.argv[1])
 	var lobj *robj
+	//if the key exists, then determine if it is a list.
+	//if it is not, then throw an error exception.
 	if *i != nil && (*i).(*robj).encoding != REDIS_ENCODING_LINKEDLIST {
 		addReply(c, shared.wrongtypeerr)
 		return
-	} else if *i != nil {
+	} else if *i != nil { //if it exists and is a list, then retrieve the Redis object for the list.
 		lobj = (*i).(*robj)
 	}
-
+	//foreach element starting from index 2.
 	var j uint64
 	for j = 2; j < c.argc; j++ {
+		//call `tryObjectEncoding` to perform special processing on the elements.
 		c.argv[j] = tryObjectEncoding(c.argv[j])
+
+		/**
+		If the list is empty, then initialize it, create it, and store it in the Redis database.
+		*/
 		if lobj == nil {
 			lobj = createListObject()
 			dbAdd(c.db, c.argv[1], lobj)
 		}
-		listTypePush(lobj, c.argv[j], REDIS_TAIL)
+		/**
+		pass in the list pointer, element pointer,
+		and add flag to append the element to the head or tail of the list.
+		*/
+		listTypePush(lobj, c.argv[j], where)
 	}
-
+	//return the current length of the list.
 	addReplyLongLong(c, (*lobj.ptr).(*list).len)
 }
 
