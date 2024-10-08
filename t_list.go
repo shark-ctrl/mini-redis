@@ -42,11 +42,13 @@ func listTypePop(subject *robj, where int) *robj {
 	} else if subject.encoding == REDIS_ENCODING_LINKEDLIST {
 		lobj := (*subject.ptr).(*list)
 		var ln *listNode
+		//get the head or tail element based on the linked list identifier.
 		if where == REDIS_HEAD {
 			ln = lobj.head
 		} else {
 			ln = lobj.tail
 		}
+		//read the value of the element and remove it from the linked list.
 		value = (*ln.value).(*robj)
 		listDelNode(lobj, ln)
 	} else {
