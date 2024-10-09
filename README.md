@@ -52,18 +52,19 @@ PONG
 - 支持客户端键入command指令并回复当前服务端支持的指令集。
 - 支持客户端键入PING指令感知mini-redis是否可用。
 - 完成GET、SET指令指令解析和常规用法
+- 完成列表LINDEX、LPOP、RPUSH、LRANGE指令,可作为内存消息队列
 
 
 后续开发计划:
 
-+ [ ] 字典等数据结构开发
-+ [x] 列表等数据结构开发
++ [ ] 字典数据结构开发
++ [x] 列表底层数据结构双向链表
 + [ ] 有序集合等数据结构开发
 + [x] 字符串常规`GET`指令开发调测
 + [x] 字符串`SET`指令开发调测
-+ [ ] 列表操作BLPOP、BRPOP、LINDEX、LINSERT、LLEN、LPOP、LPUSH、LRANGE、LREM、LSET、RPOP
-+ [ ] 字典所有操作指令
-+ [ ] 有序集合所有操作指令
++ [x] 列表操作LINDEX、LPOP、RPUSH、LRANGE指令开发
++ [ ] 字典操作指令开发
++ [ ] 有序集合所有操作指令开发
 + [ ] `AOF`持久化和重载机制
 + [ ] `LRU`缓存置换算法
 + [ ] 性能压测
@@ -83,6 +84,8 @@ mini-redis如何解析处理客户端请求
 
 
 硬核复刻redis底层双向链表核心实现:<https://mp.weixin.qq.com/s?__biz=MzkwODYyNTM2MQ==&mid=2247486323&idx=1&sn=70812c54fa782e459d443951c0a39752&chksm=c0c65fcdf7b1d6dbfe783d1d8e11e270fc567921a5e1cdbb699f2bb7a1be5392d9a9c791ee25#rd>
+
+聊聊我说如何用go语言实现redis列表操作:<https://mp.weixin.qq.com/s?__biz=MzkwODYyNTM2MQ==&mid=2247486416&idx=1&sn=1f5ad9ad17a80e2cd868ec8e33fb5015&chksm=c0c65f6ef7b1d6788012b590def4654e07153adcb18a7911fe87604f1eee55c1ba58e3c31012#rd>
 
 ## 关于我
 
