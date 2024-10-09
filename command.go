@@ -236,19 +236,27 @@ func lrangeCommand(c *redisClient) {
 	var end int64
 	var llen int64
 	var rangelen int64
-
+	/**
+	convert the strings at indexes 2 and 3 to numerical values.
+	If an error occurs, respond with an exception and return.
+	*/
 	if !getLongFromObjectOrReply(c, c.argv[2], &start, nil) ||
 		!getLongFromObjectOrReply(c, c.argv[3], &end, nil) {
 		return
 	}
-
-	val := lookupKeyReadOrReply(c, c.argv[1], shared.wrongtypeerr)
+	/**
+	check if the linked list exists,
+	and if it doesn't, respond with a null value.
+	*/
+	val := lookupKeyReadOrReply(c, c.argv[1], shared.emptymultibulk)
 	o = (*val).(*robj)
-
+	/**
+	check if the type is a linked list; if it is not, return a type error.
+	*/
 	if o == nil || !checkType(c, o, REDIS_LIST) {
 		return
 	}
-
+	//get the start and end values of a range query. If they are negative, add the length of the linked list.
 	llen = (*o.ptr).(*list).len
 	if start < 0 {
 		start += llen
@@ -261,16 +269,19 @@ func lrangeCommand(c *redisClient) {
 	if end < 0 {
 		end += llen
 	}
-
+	//if start is still less than 0, set it to 0.
 	if start < 0 {
 		start = 0
 	}
-
+	/**
+	check if start is greater than the length of the linked list or if start is greater than end.
+	If either of these exceptions occurs, respond with an error.
+	*/
 	if start >= llen || start > end {
 		addReplyError(c, shared.emptymultibulk)
 		return
 	}
-
+	//if end is greater than list length, set it to the list length.
 	if end > llen {
 		end = llen - 1
 	}
@@ -283,6 +294,7 @@ func lrangeCommand(c *redisClient) {
 	} else if o.encoding == REDIS_ENCODING_LINKEDLIST {
 		lobj := (*o.ptr).(*list)
 		node := listIndex(lobj, start)
+		//foreach the linked list starting from "start" based on "rangelen."
 		for rangelen > 0 {
 			rObj := (*node.value).(*robj)
 			addReplyBulk(c, rObj)
@@ -297,8 +309,12 @@ func lrangeCommand(c *redisClient) {
 }
 
 func lindexCommand(c *redisClient) {
+	/**
+	check if the linked list exists; if it doesn't, return empty.
+	*/
 	i := lookupKeyReadOrReply(c, c.argv[1], shared.nullbulk)
 	r := (*i).(*robj)
+	//verify if the type is a linked list.
 	if *i == nil || checkType(c, r, REDIS_LIST) {
 		return
 	}
@@ -306,6 +322,10 @@ func lindexCommand(c *redisClient) {
 	if r.encoding == REDIS_ENCODING_ZIPLIST {
 		//todo
 	} else if r.encoding == REDIS_ENCODING_LINKEDLIST {
+		/**
+		retrieve the parameter at index 2 to obtain the index position,
+		then fetch the element from the linked list at that index and return it.
+		*/
 		lobj := (*r.ptr).(*list)
 		s := (*c.argv[2].ptr).(string)
 		idx, _ := strconv.ParseInt(s, 10, 64)
@@ -324,20 +344,28 @@ func lindexCommand(c *redisClient) {
 }
 
 func lpopCommand(c *redisClient) {
+	// params is REDIS_HEAD, which means to retrieve the head element.
 	popGenericCommand(c, REDIS_HEAD)
 }
 
 func popGenericCommand(c *redisClient, where int) {
+	//check if the key exists, and if it doesn't, respond with an empty response.
 	o := lookupKeyReadOrReply(c, c.argv[1], shared.nullbulk)
 	r := (*o).(*robj)
+	//If the type is not a linked list, throw an exception and return.
 	if o == nil || checkType(c, r, REDIS_LIST) {
 		return
 	}
 
 	value := listTypePop(r, where)
+	//retrieve the first element of the linked list based on the WHERE identifier.
 	if value == nil {
 		addReply(c, shared.nullbulk)
 	} else {
+		/**
+		return the element value, and check if the linked list is empty.
+		If it is empty, delete the key-value pair in the Redis database.
+		*/
 		addReplyBulk(c, value)
 		if listTypeLength(r) == 0 {
 			dbDelete(c.db, c.argv[1])
