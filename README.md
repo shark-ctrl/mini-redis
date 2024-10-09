@@ -63,7 +63,7 @@ PONG
 + [x] 字符串常规`GET`指令开发调测
 + [x] 字符串`SET`指令开发调测
 + [x] 列表操作LINDEX、LPOP、RPUSH、LRANGE指令开发
-+ [ ] 字典操作指令开发
++ [ ] 字典操作HSET、HMSET、HSETNX、HGET、HMGET、HGETALL、HDEL指令开发
 + [ ] 有序集合所有操作指令开发
 + [ ] `AOF`持久化和重载机制
 + [ ] `LRU`缓存置换算法
