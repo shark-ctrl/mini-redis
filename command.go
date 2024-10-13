@@ -12,19 +12,27 @@ type redisCommandProc func(redisClient *redisClient)
 type redisCommand struct {
 	name  string
 	proc  redisCommandProc
+	arity int
 	sflag string
 	flag  int
 }
 
 var redisCommandTable = []redisCommand{
-	{name: "COMMAND", proc: commandCommand, sflag: "rlt", flag: 0},
-	{name: "PING", proc: pingCommand, sflag: "rtF", flag: 0},
+	{name: "COMMAND", proc: commandCommand, arity: 0, sflag: "rlt", flag: 0},
+	{name: "PING", proc: pingCommand, arity: 0, sflag: "rtF", flag: 0},
 	{name: "SET", proc: setCommand, sflag: "rtF", flag: 0},
 	{name: "GET", proc: getCommand, sflag: "rtF", flag: 0},
 	{name: "RPUSH", proc: rpushCommand, sflag: "wmF", flag: 0},
 	{name: "LRANGE", proc: lrangeCommand, sflag: "r", flag: 0},
 	{name: "LINDEX", proc: lindexCommand, sflag: "r", flag: 0},
 	{name: "LPOP", proc: lpopCommand, sflag: "wF", flag: 0},
+	{name: "HSET", proc: hsetCommand, arity: 4, sflag: "wmF", flag: 0},
+	{name: "HMSET", proc: hmsetCommand, arity: -4, sflag: "wm", flag: 0},
+	{name: "HSETNX", proc: hsetnxCommand, arity: 4, sflag: "wm", flag: 0},
+	{name: "HGET", proc: hgetCommand, arity: 3, sflag: "rF", flag: 0},
+	{name: "HMGET", proc: hmgetCommand, arity: -3, sflag: "r", flag: 0},
+	{name: "HGETALL", proc: hgetallCommand, arity: 2, sflag: "r", flag: 0},
+	{name: "hdel", proc: hdelCommand, arity: -3, sflag: "wF", flag: 0},
 }
 var shared sharedObjectsStruct
 
@@ -113,8 +121,8 @@ func setGenericCommand(c *redisClient, flags int, key *robj, val *robj, expire s
 	   1. if the command contains "nx" and the data exists for this value.
 	   2. if the command contains "xx" and the data for this value does not exist.
 	*/
-	if (flags&REDIS_SET_NX > 0 && *lookupKeyWrite(c.db, key) != nil) ||
-		(flags&REDIS_SET_XX > 0 && *lookupKeyWrite(c.db, key) == nil) {
+	if (flags&REDIS_SET_NX > 0 && lookupKeyWrite(c.db, key) != nil) ||
+		(flags&REDIS_SET_XX > 0 && lookupKeyWrite(c.db, key) == nil) {
 		addReply(c, shared.nullbulk)
 		return
 	}
@@ -178,12 +186,11 @@ func getCommand(c *redisClient) {
 func getGenericCommand(c *redisClient) int {
 	//check if the key exists, and if it does not, return a null bulk response from the constant values.
 	o := lookupKeyReadOrReply(c, c.argv[1], shared.nullbulk)
-	if *o == nil {
+	if o == nil {
 		return REDIS_OK
 	}
 	//return the value to the client if it exists.
-	val := (*o).(*robj)
-	addReplyBulk(c, val)
+	addReplyBulk(c, o)
 	return REDIS_OK
 }
 
@@ -197,15 +204,15 @@ func rpushCommand(c *redisClient) {
 
 func pushGenericCommand(c *redisClient, where int) {
 	//check if the corresponding key exists.
-	i := lookupKeyWrite(c.db, c.argv[1])
+	o := lookupKeyWrite(c.db, c.argv[1])
 	var lobj *robj
 	//if the key exists, then determine if it is a list.
 	//if it is not, then throw an error exception.
-	if *i != nil && (*i).(*robj).encoding != REDIS_ENCODING_LINKEDLIST {
+	if o != nil && o.encoding != REDIS_ENCODING_LINKEDLIST {
 		addReply(c, shared.wrongtypeerr)
 		return
-	} else if *i != nil { //if it exists and is a list, then retrieve the Redis object for the list.
-		lobj = (*i).(*robj)
+	} else if o != nil { //if it exists and is a list, then retrieve the Redis object for the list.
+		lobj = o
 	}
 	//foreach element starting from index 2.
 	var j uint64
@@ -248,8 +255,8 @@ func lrangeCommand(c *redisClient) {
 	check if the linked list exists,
 	and if it doesn't, respond with a null value.
 	*/
-	val := lookupKeyReadOrReply(c, c.argv[1], shared.emptymultibulk)
-	o = (*val).(*robj)
+	o = lookupKeyReadOrReply(c, c.argv[1], shared.emptymultibulk)
+
 	/**
 	check if the type is a linked list; if it is not, return a type error.
 	*/
@@ -312,21 +319,21 @@ func lindexCommand(c *redisClient) {
 	/**
 	check if the linked list exists; if it doesn't, return empty.
 	*/
-	i := lookupKeyReadOrReply(c, c.argv[1], shared.nullbulk)
-	r := (*i).(*robj)
+	o := lookupKeyReadOrReply(c, c.argv[1], shared.nullbulk)
+
 	//verify if the type is a linked list.
-	if *i == nil || checkType(c, r, REDIS_LIST) {
+	if o == nil || checkType(c, o, REDIS_LIST) {
 		return
 	}
 
-	if r.encoding == REDIS_ENCODING_ZIPLIST {
+	if o.encoding == REDIS_ENCODING_ZIPLIST {
 		//todo
-	} else if r.encoding == REDIS_ENCODING_LINKEDLIST {
+	} else if o.encoding == REDIS_ENCODING_LINKEDLIST {
 		/**
 		retrieve the parameter at index 2 to obtain the index position,
 		then fetch the element from the linked list at that index and return it.
 		*/
-		lobj := (*r.ptr).(*list)
+		lobj := (*o.ptr).(*list)
 		s := (*c.argv[2].ptr).(string)
 		idx, _ := strconv.ParseInt(s, 10, 64)
 		ln := listIndex(lobj, idx)
@@ -351,13 +358,13 @@ func lpopCommand(c *redisClient) {
 func popGenericCommand(c *redisClient, where int) {
 	//check if the key exists, and if it doesn't, respond with an empty response.
 	o := lookupKeyReadOrReply(c, c.argv[1], shared.nullbulk)
-	r := (*o).(*robj)
+
 	//If the type is not a linked list, throw an exception and return.
-	if o == nil || checkType(c, r, REDIS_LIST) {
+	if o == nil || checkType(c, o, REDIS_LIST) {
 		return
 	}
 
-	value := listTypePop(r, where)
+	value := listTypePop(o, where)
 	//retrieve the first element of the linked list based on the WHERE identifier.
 	if value == nil {
 		addReply(c, shared.nullbulk)
@@ -367,8 +374,156 @@ func popGenericCommand(c *redisClient, where int) {
 		If it is empty, delete the key-value pair in the Redis database.
 		*/
 		addReplyBulk(c, value)
-		if listTypeLength(r) == 0 {
+		if listTypeLength(o) == 0 {
 			dbDelete(c.db, c.argv[1])
 		}
 	}
+}
+
+func hsetCommand(c *redisClient) {
+	o := hashTypeLookupWriteOrCreate(c, c.argv[0])
+
+	if o == nil {
+		return
+	}
+
+	hashTypeTryObjectEncoding(o, c.argv[0], c.argv[1])
+
+	update := hashTypeSet(o, c.argv[0], c.argv[1])
+	if update == 1 {
+		addReply(c, shared.czero)
+	} else {
+		addReply(c, shared.cone)
+	}
+}
+
+func hmsetCommand(c *redisClient) {
+	if c.argc%2 == 1 {
+		errMsg := "wrong number of arguments for HMSET"
+		addReplyError(c, &errMsg)
+		return
+	}
+	var i uint64
+	o := hashTypeLookupWriteOrCreate(c, c.argv[1])
+	for i = 2; i < c.argc; i += 2 {
+		hashTypeTryObjectEncoding(o, c.argv[i], c.argv[i+1])
+		hashTypeSet(o, c.argv[i], c.argv[i+1])
+	}
+
+	addReply(c, shared.ok)
+}
+
+func hsetnxCommand(c *redisClient) {
+
+	o := hashTypeLookupWriteOrCreate(c, c.argv[1])
+
+	if hashTypeExists(o, c.argv[1]) {
+		addReply(c, shared.czero)
+		return
+	}
+	hashTypeTryObjectEncoding(o, c.argv[1], c.argv[2])
+	hashTypeSet(o, c.argv[1], c.argv[2])
+	addReply(c, shared.cone)
+
+}
+
+func hgetCommand(c *redisClient) {
+	o := lookupKeyReadOrReply(c, c.argv[1], shared.nullbulk)
+	if o == nil || checkType(c, o, REDIS_HASH) {
+		return
+	}
+
+	addHashFieldToReply(c, o, c.argv[2])
+
+}
+
+func addHashFieldToReply(c *redisClient, o *robj, field *robj) {
+
+	if o == nil {
+		addReply(c, shared.nullbulk)
+		return
+	}
+
+	if o.encoding == REDIS_ENCODING_ZIPLIST {
+		//todo something
+	} else if o.encoding == REDIS_ENCODING_HT {
+		var value *robj
+		if hashTypeGetFromHashTable(o, field, value) {
+			addReplyBulk(c, value)
+		} else {
+			addReply(c, shared.nullbulk)
+		}
+	}
+
+}
+
+func hashTypeGetFromHashTable(o *robj, field *robj, value *robj) bool {
+	dict := (*o.ptr).(map[string]*robj)
+	key := (*field.ptr).(string)
+	if v, e := dict[key]; e {
+		*value.ptr = v
+		return true
+
+	}
+
+	return false
+}
+
+func hmgetCommand(c *redisClient) {
+	o := lookupKeyReadOrReply(c, c.argv[1], shared.nullbulk)
+	if o == nil || checkType(c, o, REDIS_HASH) {
+		return
+	}
+
+	addReplyMultiBulkLen(c, int64(c.argc-2))
+
+	var i uint64
+	for i = 2; i < c.argc; i++ {
+		addHashFieldToReply(c, o, c.argv[i])
+	}
+}
+
+func hgetallCommand(c *redisClient) {
+	o := lookupKeyReadOrReply(c, c.argv[1], shared.emptymultibulk)
+	if o == nil || checkType(c, o, REDIS_HASH) {
+		return
+	}
+
+}
+
+func genericHgetallCommand(c *redisClient, flags int) {
+	multiplier := 0
+
+	o := lookupKeyReadOrReply(c, c.argv[1], shared.emptymultibulk)
+	if o == nil || checkType(c, o, REDIS_HASH) {
+		return
+	}
+
+	if flags&REDIS_HASH_KEY > 0 {
+		multiplier++
+	}
+
+	if flags&REDIS_HASH_VALUE > 0 {
+		multiplier++
+	}
+	dict := (*o.ptr).(map[string]*robj)
+	l := len(dict)
+	addReplyMultiBulkLen(c, int64(l))
+
+	for key, value := range dict {
+		if flags&REDIS_HASH_KEY > 0 {
+			i := interface{}(key)
+			object := createObject(REDIS_STRING, &i)
+			addReplyBulk(c, object)
+		}
+
+		if flags&REDIS_HASH_VALUE > 0 {
+			addReplyBulk(c, value)
+		}
+	}
+
+}
+
+func hdelCommand(c *redisClient) {
+
 }

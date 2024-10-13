@@ -66,6 +66,9 @@ const (
 
 	REDIS_SHARED_INTEGERS    = 10000
 	REDIS_SHARED_BULKHDR_LEN = 32
+
+	REDIS_HASH_KEY   = 1
+	REDIS_HASH_VALUE = 2
 )
 
 type redisServer struct {
@@ -107,7 +110,7 @@ func initServer() {
 
 	for j := 0; j < server.dbnum; j++ {
 		server.db[j].id = j
-		server.db[j].dict = make(map[string]interface{})
+		server.db[j].dict = make(map[string]*robj)
 		server.db[j].expires = make(map[string]int64)
 	}
 }

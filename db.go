@@ -3,7 +3,7 @@ package main
 import "time"
 
 type redisDb struct {
-	dict    map[string]interface{}
+	dict    map[string]*robj
 	expires map[string]int64
 	id      int
 }
@@ -14,11 +14,11 @@ func lookupKeyWriteOrReply(c *redisClient, key *robj, reply *robj) *robj {
 		s := (*reply.ptr).(string)
 		addReply(c, &s)
 	}
-	r := (*o).(robj)
-	return &r
+
+	return o
 }
 
-func lookupKeyWrite(db *redisDb, key *robj) *interface{} {
+func lookupKeyWrite(db *redisDb, key *robj) *robj {
 	//check if the key has expired, and if so, delete it.
 	expireIfNeeded(db, key)
 	//query the dictionary for the value corresponding to the key.
@@ -51,22 +51,22 @@ func deDelete(db *redisDb, key *robj) {
 	delete(db.dict, (*key.ptr).(string))
 }
 
-func lookupKeyRead(db *redisDb, key *robj) *interface{} {
+func lookupKeyRead(db *redisDb, key *robj) *robj {
 	//check if the key has expired and delete it.
 	expireIfNeeded(db, key)
 	val := lookupKey(db, key)
 	return val
 }
 
-func lookupKey(db *redisDb, key *robj) *interface{} {
+func lookupKey(db *redisDb, key *robj) *robj {
 	val := db.dict[(*key.ptr).(string)]
-	return &val
+	return val
 }
 
-func lookupKeyReadOrReply(c *redisClient, key *robj, reply *string) *interface{} {
+func lookupKeyReadOrReply(c *redisClient, key *robj, reply *string) *robj {
 	//check if the key has expired to decide whether to delete the key from the dictionary, then query the dictionary for the result and return it.
 	o := lookupKeyRead(c.db, key)
-	if *o == nil {
+	if o == nil {
 		addReply(c, reply)
 	}
 	return o
