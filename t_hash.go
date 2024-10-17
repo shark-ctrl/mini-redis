@@ -11,8 +11,7 @@ func hashTypeLookupWriteOrCreate(c *redisClient, key *robj) *robj {
 		return r
 	}
 
-	r := (*o).(*robj)
-	if r.robjType != REDIS_HASH {
+	if o.robjType != REDIS_HASH {
 		addReplyError(c, shared.wrongtypeerr)
 	}
 	return nil
@@ -68,4 +67,23 @@ func hashTypeExists(o *robj, field *robj) bool {
 		return true
 	}
 	return false
+}
+
+func hashTypeDelete(o *robj, field *robj) bool {
+	var deleted bool
+	if o.encoding == REDIS_ENCODING_ZIPLIST {
+		//todo
+		return false
+	} else if o.encoding == REDIS_ENCODING_HT {
+		dict := (*o.ptr).(map[string]*robj)
+		key := (*field.ptr).(string)
+		_, ok := dict[key]
+		if ok {
+			delete(dict, key)
+			deleted = true
+		}
+	} else {
+		log.Panic("Unknown hash encoding")
+	}
+	return deleted
 }

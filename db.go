@@ -8,11 +8,10 @@ type redisDb struct {
 	id      int
 }
 
-func lookupKeyWriteOrReply(c *redisClient, key *robj, reply *robj) *robj {
+func lookupKeyWriteOrReply(c *redisClient, key *robj, reply *string) *robj {
 	o := lookupKeyWrite(c.db, key)
 	if o == nil {
-		s := (*reply.ptr).(string)
-		addReply(c, &s)
+		addReply(c, reply)
 	}
 
 	return o

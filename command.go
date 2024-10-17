@@ -32,7 +32,7 @@ var redisCommandTable = []redisCommand{
 	{name: "HGET", proc: hgetCommand, arity: 3, sflag: "rF", flag: 0},
 	{name: "HMGET", proc: hmgetCommand, arity: -3, sflag: "r", flag: 0},
 	{name: "HGETALL", proc: hgetallCommand, arity: 2, sflag: "r", flag: 0},
-	{name: "hdel", proc: hdelCommand, arity: -3, sflag: "wF", flag: 0},
+	{name: "HDEL", proc: hdelCommand, arity: -3, sflag: "wF", flag: 0},
 }
 var shared sharedObjectsStruct
 
@@ -484,10 +484,7 @@ func hmgetCommand(c *redisClient) {
 }
 
 func hgetallCommand(c *redisClient) {
-	o := lookupKeyReadOrReply(c, c.argv[1], shared.emptymultibulk)
-	if o == nil || checkType(c, o, REDIS_HASH) {
-		return
-	}
+	genericHgetallCommand(c, REDIS_HASH_KEY|REDIS_HASH_VALUE)
 
 }
 
@@ -525,5 +522,23 @@ func genericHgetallCommand(c *redisClient, flags int) {
 }
 
 func hdelCommand(c *redisClient) {
+	var deleted int64
+	o := lookupKeyWriteOrReply(c, c.argv[1], shared.czero)
+	if o == nil || checkType(c, o, REDIS_HASH) {
+		return
+	}
+	var i uint64
+	for i = 2; i < c.argc; i++ {
+		if hashTypeDelete(o, c.argv[i]) {
+			deleted++
+		}
+	}
+
+	dict := (*o.ptr).(map[string]*robj)
+	if len(dict) == 0 {
+		dbDelete(c.db, c.argv[1])
+	}
+
+	addReplyLongLong(c, deleted)
 
 }
