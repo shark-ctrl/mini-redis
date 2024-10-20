@@ -381,15 +381,15 @@ func popGenericCommand(c *redisClient, where int) {
 }
 
 func hsetCommand(c *redisClient) {
-	o := hashTypeLookupWriteOrCreate(c, c.argv[0])
+	o := hashTypeLookupWriteOrCreate(c, c.argv[1])
 
 	if o == nil {
 		return
 	}
 
-	hashTypeTryObjectEncoding(o, c.argv[0], c.argv[1])
+	hashTypeTryObjectEncoding(o, c.argv[2], c.argv[3])
 
-	update := hashTypeSet(o, c.argv[0], c.argv[1])
+	update := hashTypeSet(o, c.argv[2], c.argv[3])
 	if update == 1 {
 		addReply(c, shared.czero)
 	} else {
