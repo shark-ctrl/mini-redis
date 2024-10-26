@@ -12,7 +12,7 @@ func hashTypeLookupWriteOrCreate(c *redisClient, key *robj) *robj {
 	}
 
 	if o.robjType != REDIS_HASH {
-		addReplyError(c, shared.wrongtypeerr)
+		addReply(c, shared.wrongtypeerr)
 		return nil
 	}
 	return o
@@ -32,14 +32,14 @@ func createHashObject() *robj {
 	return o
 }
 
-func hashTypeTryObjectEncoding(subject *robj, o1 *robj, o2 *robj) {
+func hashTypeTryObjectEncoding(subject *robj, o1 **robj, o2 **robj) {
 	if subject.encoding == REDIS_ENCODING_HT {
 		if o1 != nil {
-			o1 = tryObjectEncoding(o1)
+			*o1 = tryObjectEncoding(*o1)
 		}
 
 		if o2 != nil {
-			o2 = tryObjectEncoding(o2)
+			*o2 = tryObjectEncoding(*o2)
 		}
 	}
 }

@@ -19,7 +19,7 @@ func addReplyBulk(c *redisClient, obj *robj) {
 }
 
 func addReplyError(c *redisClient, s *string) {
-	c.conn.Write([]byte("-ERR\r\n" + *s + "\r\n"))
+	c.conn.Write([]byte("-ERR " + *s + "\r\n"))
 }
 
 func addReplyLongLong(c *redisClient, ll int64) {

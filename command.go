@@ -12,7 +12,7 @@ type redisCommandProc func(redisClient *redisClient)
 type redisCommand struct {
 	name  string
 	proc  redisCommandProc
-	arity int
+	arity int64
 	sflag string
 	flag  int
 }
@@ -388,7 +388,7 @@ func hsetCommand(c *redisClient) {
 		return
 	}
 
-	hashTypeTryObjectEncoding(o, c.argv[2], c.argv[3])
+	hashTypeTryObjectEncoding(o, &c.argv[2], &c.argv[3])
 
 	update := hashTypeSet(o, c.argv[2], c.argv[3])
 	if update == 1 {
@@ -407,7 +407,7 @@ func hmsetCommand(c *redisClient) {
 	var i uint64
 	o := hashTypeLookupWriteOrCreate(c, c.argv[1])
 	for i = 2; i < c.argc; i += 2 {
-		hashTypeTryObjectEncoding(o, c.argv[i], c.argv[i+1])
+		hashTypeTryObjectEncoding(o, &c.argv[i], &c.argv[i+1])
 		hashTypeSet(o, c.argv[i], c.argv[i+1])
 	}
 
@@ -418,12 +418,12 @@ func hsetnxCommand(c *redisClient) {
 
 	o := hashTypeLookupWriteOrCreate(c, c.argv[1])
 
-	if hashTypeExists(o, c.argv[1]) {
+	if hashTypeExists(o, c.argv[2]) {
 		addReply(c, shared.czero)
 		return
 	}
-	hashTypeTryObjectEncoding(o, c.argv[1], c.argv[2])
-	hashTypeSet(o, c.argv[1], c.argv[2])
+	hashTypeTryObjectEncoding(o, &c.argv[2], &c.argv[3])
+	hashTypeSet(o, c.argv[2], c.argv[3])
 	addReply(c, shared.cone)
 
 }
@@ -448,8 +448,8 @@ func addHashFieldToReply(c *redisClient, o *robj, field *robj) {
 	if o.encoding == REDIS_ENCODING_ZIPLIST {
 		//todo something
 	} else if o.encoding == REDIS_ENCODING_HT {
-		var value *robj
-		if hashTypeGetFromHashTable(o, field, value) {
+		value := new(robj)
+		if hashTypeGetFromHashTable(o, field, &value) {
 			addReplyBulk(c, value)
 		} else {
 			addReply(c, shared.nullbulk)
@@ -458,11 +458,11 @@ func addHashFieldToReply(c *redisClient, o *robj, field *robj) {
 
 }
 
-func hashTypeGetFromHashTable(o *robj, field *robj, value *robj) bool {
+func hashTypeGetFromHashTable(o *robj, field *robj, value **robj) bool {
 	dict := (*o.ptr).(map[string]*robj)
 	key := (*field.ptr).(string)
 	if v, e := dict[key]; e {
-		*value.ptr = v
+		*value = v
 		return true
 
 	}
