@@ -162,7 +162,8 @@ func createSharedObjects() {
 		emptymultibulk: &emptymultibulk,
 	}
 
-	for i := 0; i < REDIS_SHARED_INTEGERS; i++ {
+	var i int64
+	for i = 0; i < REDIS_SHARED_INTEGERS; i++ {
 		num := interface{}(i)
 		shared.integers[i] = createObject(REDIS_STRING, &num)
 		shared.integers[i].encoding = REDIS_ENCODING_INT
@@ -260,7 +261,7 @@ func lrangeCommand(c *redisClient) {
 	/**
 	check if the type is a linked list; if it is not, return a type error.
 	*/
-	if o == nil || !checkType(c, o, REDIS_LIST) {
+	if o == nil || checkType(c, o, REDIS_LIST) {
 		return
 	}
 	//get the start and end values of a range query. If they are negative, add the length of the linked list.
