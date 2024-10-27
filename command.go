@@ -382,15 +382,23 @@ func popGenericCommand(c *redisClient, where int) {
 }
 
 func hsetCommand(c *redisClient) {
+	/**
+	check if the dict object exists, and if it does not exist, create hash obj
+	if it exists, then determine whether it is a hash obj. If not, return a type error.
+	*/
 	o := hashTypeLookupWriteOrCreate(c, c.argv[1])
 
 	if o == nil {
 		return
 	}
-
+	//try to convert strings that can be converted to numerical types into numerical types.
 	hashTypeTryObjectEncoding(o, &c.argv[2], &c.argv[3])
-
+	/**
+	pass the information to the database to find the dictionary object along with the fields and values,
+	return the dict update count
+	*/
 	update := hashTypeSet(o, c.argv[2], c.argv[3])
+	//if it is an update operation, return 0; if it is the first insertion of a field, return 1.
 	if update == 1 {
 		addReply(c, shared.czero)
 	} else {
@@ -399,11 +407,19 @@ func hsetCommand(c *redisClient) {
 }
 
 func hmsetCommand(c *redisClient) {
+	/**
+	determine if the  command params is singular
+	if it is, respond with wrong number
+	*/
 	if c.argc%2 == 1 {
 		errMsg := "wrong number of arguments for HMSET"
 		addReplyError(c, &errMsg)
 		return
 	}
+	/**
+	starting from index 2,foreach key-value pair,
+	perform encoding conversion, and save to dict obj
+	*/
 	var i uint64
 	o := hashTypeLookupWriteOrCreate(c, c.argv[1])
 	for i = 2; i < c.argc; i += 2 {
@@ -415,31 +431,37 @@ func hmsetCommand(c *redisClient) {
 }
 
 func hsetnxCommand(c *redisClient) {
-
+	//perform dict lookup, type validation, and creation if it does not exist.
 	o := hashTypeLookupWriteOrCreate(c, c.argv[1])
-
+	//if it does not exist, return 0 and do not perform any operation.
 	if hashTypeExists(o, c.argv[2]) {
 		addReply(c, shared.czero)
 		return
 	}
+	/**
+		1. perform the field type and value type conversion.
+	 	2. save field(argv[2])、value(argv[3]) to the dict obj
+		3. respond to the client with the result 1
+	*/
 	hashTypeTryObjectEncoding(o, &c.argv[2], &c.argv[3])
 	hashTypeSet(o, c.argv[2], c.argv[3])
 	addReply(c, shared.cone)
-
 }
 
 func hgetCommand(c *redisClient) {
+	//check if the dictionary exists, and if it does not exist, return null.
 	o := lookupKeyReadOrReply(c, c.argv[1], shared.nullbulk)
+	//if it is not a hash object, return a type error
 	if o == nil || checkType(c, o, REDIS_HASH) {
 		return
 	}
-
+	//if the corresponding field in the dictionary exists, return this value
 	addHashFieldToReply(c, o, c.argv[2])
 
 }
 
 func addHashFieldToReply(c *redisClient, o *robj, field *robj) {
-
+	//If the dictionary is empty, return nullbulk
 	if o == nil {
 		addReply(c, shared.nullbulk)
 		return
@@ -449,6 +471,10 @@ func addHashFieldToReply(c *redisClient, o *robj, field *robj) {
 		//todo something
 	} else if o.encoding == REDIS_ENCODING_HT {
 		value := new(robj)
+		/**
+		pass the secondary pointer of the value to record the value corresponding to the field in the dictionary.
+		if it is not null, return value; otherwise, return nullbulk.
+		*/
 		if hashTypeGetFromHashTable(o, field, &value) {
 			addReplyBulk(c, value)
 		} else {
@@ -479,12 +505,17 @@ func hmgetCommand(c *redisClient) {
 	addReplyMultiBulkLen(c, int64(c.argc-2))
 
 	var i uint64
+	//starting from the first field, read the fields from the dictionary and return them.
 	for i = 2; i < c.argc; i++ {
 		addHashFieldToReply(c, o, c.argv[i])
 	}
 }
 
 func hgetallCommand(c *redisClient) {
+	/**
+	Use the XOR operation between the key and value to indicate that
+	the current function needs to retrieve all keys and values from the dict.
+	*/
 	genericHgetallCommand(c, REDIS_HASH_KEY|REDIS_HASH_VALUE)
 
 }
@@ -496,18 +527,28 @@ func genericHgetallCommand(c *redisClient, flags int) {
 	if o == nil || checkType(c, o, REDIS_HASH) {
 		return
 	}
-
+	/**
+	if the result of the bitwise AND operation between the key and REDIS_HASH_KEY is greater than 0,
+	increment the multiplier.
+	*/
 	if flags&REDIS_HASH_KEY > 0 {
 		multiplier++
 	}
-
+	/**
+	if the result of the bitwise AND operation between the key and REDIS_HASH_VALUE is greater than 0,
+	increment the multiplier.
+	*/
 	if flags&REDIS_HASH_VALUE > 0 {
 		multiplier++
 	}
+	/**
+	response the client to return the value of the dictionary size multiplied by multiplier.
+
+	*/
 	dict := (*o.ptr).(map[string]*robj)
 	l := len(dict)
-	addReplyMultiBulkLen(c, int64(l))
-
+	addReplyMultiBulkLen(c, int64(l*multiplier))
+	//return the key-value pairs as required.
 	for key, value := range dict {
 		if flags&REDIS_HASH_KEY > 0 {
 			i := interface{}(key)
@@ -528,13 +569,14 @@ func hdelCommand(c *redisClient) {
 	if o == nil || checkType(c, o, REDIS_HASH) {
 		return
 	}
+	//starting from index 2, locate all the keys.
 	var i uint64
 	for i = 2; i < c.argc; i++ {
-		if hashTypeDelete(o, c.argv[i]) {
+		if hashTypeDelete(o, c.argv[i]) { //If the deletion is successful, increment the deleted counter.
 			deleted++
 		}
 	}
-
+	//If the dictionary has no key-value pairs after deletion, delete it directly.
 	dict := (*o.ptr).(map[string]*robj)
 	if len(dict) == 0 {
 		dbDelete(c.db, c.argv[1])

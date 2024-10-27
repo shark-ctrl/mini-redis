@@ -55,7 +55,7 @@ func tryObjectEncoding(o *robj) *robj {
 func createObject(oType int, ptr *interface{}) *robj {
 	o := new(robj)
 	o.robjType = oType
-	o.encoding = REDIS_ENCODING_RAW
+	o.encoding = REDIS_ENCODING_EMBSTR
 	o.ptr = ptr
 	return o
 }
