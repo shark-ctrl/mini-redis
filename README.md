@@ -73,24 +73,24 @@ PONG
 ## 如何阅读源码
 
 本项目目录结构为:
-- adlist.go:redis底层双向链表实现 
-- adlist_test.go:双向链表测试单元 
-- client.go: 处理redis-cli请求的客户端对象
-- command.go: redis所有操作指令实现
-- db.go: redis内存数据库
-- dict.go: 哈希对象操作实现
-- networking.go: 网络操作函数集
-- object.go:redis对象创建函数
-- redis.conf: 配置文件
-- redis.go: redis服务端
-- t_hash.go:针对redis对象的哈希操作函数
-- t_list.go: 基于adlist双向链表对于redis对象的链表操作函数
-- util.go:mini-redis工具类
-- main.go:mini-redis启动入口 
-- go.mod 
-- build-windows.sh:Windows下程序启动脚本 
-- build-linux.sh:Linux启动脚本 
-- README.md 
+- `adlist.go` : redis底层双向链表实现 
+- `adlist_test.go` : 双向链表测试单元 
+- `client.go` : 处理redis-cli请求的客户端对象
+- `command.go` : redis所有操作指令实现
+- `db.go` : redis内存数据库
+- `dict.go` : 哈希对象操作实现
+- `networking.go` : 网络操作函数集
+- `object.go` : redis对象创建函数
+- `redis.conf` : 配置文件
+- `redis.go` : redis服务端
+- `t_hash.go` : 针对redis对象的哈希操作函数
+- `t_list.go` : 基于adlist双向链表对于redis对象的链表操作函数
+- `util.go` : mini-redis工具类
+- `main.go` : mini-redis启动入口 
+- `go.mod` 
+- `build-windows.sh` : Windows下程序启动脚本 
+- `build-linux.sh` : Linux启动脚本 
+- `README.md` 
 
 
 
