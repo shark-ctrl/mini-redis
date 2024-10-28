@@ -63,7 +63,7 @@ PONG
 + [x] 字符串常规`GET`指令开发调测
 + [x] 字符串`SET`指令开发调测
 + [x] 列表操作LINDEX、LPOP、RPUSH、LRANGE指令开发
-+ [ ] 字典操作HSET、HMSET、HSETNX、HGET、HMGET、HGETALL、HDEL指令开发
++ [x] 字典操作HSET、HMSET、HSETNX、HGET、HMGET、HGETALL、HDEL指令开发
 + [ ] 有序集合所有操作指令开发
 + [ ] `AOF`持久化和重载机制
 + [ ] `LRU`缓存置换算法
@@ -72,7 +72,31 @@ PONG
 
 ## 如何阅读源码
 
-该项目笔者还在不断和开发和迭代中，在开发过程中的设计和实现也都会不断输出为文档，读者可以按需取用下面的文章来了解笔者的开发过程和实现思路：
+本项目目录结构为:
+- adlist.go:redis底层双向链表实现 
+- adlist_test.go:双向链表测试单元 
+- client.go: 处理redis-cli请求的客户端对象
+- command.go: redis所有操作指令实现
+- db.go: redis内存数据库
+- dict.go: 哈希对象操作实现
+- networking.go: 网络操作函数集
+- object.go:redis对象创建函数
+- redis.conf: 配置文件
+- redis.go: redis服务端
+- t_hash.go:针对redis对象的哈希操作函数
+- t_list.go: 基于adlist双向链表对于redis对象的链表操作函数
+- util.go:mini-redis工具类
+- main.go:mini-redis启动入口 
+- go.mod 
+- build-windows.sh:Windows下程序启动脚本 
+- build-linux.sh:Linux启动脚本 
+- README.md 
+
+
+
+
+
+同时，在开发过程中的设计和实现也都会不断输出为文档，读者可以按需取用下面的文章来了解笔者的开发过程和实现思路：
 
 
 来聊聊我用go手写redis这件事:<https://mp.weixin.qq.com/s?__biz=MzkwODYyNTM2MQ==&mid=2247486169&idx=1&sn=9b562eca113fbbe02d07f9ae2ccf0e79&chksm=c0c65e67f7b1d77166b7ff9a7a0403fb02d39ae1a111a73e12f7f1cdc3e79e91b2d116a5908a#rd>
@@ -86,6 +110,8 @@ mini-redis如何解析处理客户端请求
 硬核复刻redis底层双向链表核心实现:<https://mp.weixin.qq.com/s?__biz=MzkwODYyNTM2MQ==&mid=2247486323&idx=1&sn=70812c54fa782e459d443951c0a39752&chksm=c0c65fcdf7b1d6dbfe783d1d8e11e270fc567921a5e1cdbb699f2bb7a1be5392d9a9c791ee25#rd>
 
 聊聊我说如何用go语言实现redis列表操作:<https://mp.weixin.qq.com/s?__biz=MzkwODYyNTM2MQ==&mid=2247486416&idx=1&sn=1f5ad9ad17a80e2cd868ec8e33fb5015&chksm=c0c65f6ef7b1d6788012b590def4654e07153adcb18a7911fe87604f1eee55c1ba58e3c31012#rd>
+
+动手复刻redis之go语言下的字典的设计与落地:<https://mp.weixin.qq.com/s?__biz=MzkwODYyNTM2MQ==&mid=2247486645&idx=1&sn=23a386c2fab95fbfd11b1b34ac1fbbcc&chksm=c0c6580bf7b1d11dde0655f93ae70265f16e8b693a0165d7b3144d9ac4d4a9d2c472b94b9d14#rd>
 
 ## 关于我
 
