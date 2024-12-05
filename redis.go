@@ -69,6 +69,8 @@ const (
 
 	REDIS_HASH_KEY   = 1
 	REDIS_HASH_VALUE = 2
+
+	ZSKIPLIST_MAXLEVEL = 32
 )
 
 type redisServer struct {
@@ -95,6 +97,25 @@ type redisObject struct {
 	robjType int
 	encoding int
 	ptr      *interface{}
+}
+
+type zskiplistNode struct {
+	obj      *robj
+	score    float64
+	backward *zskiplistNode
+	level    []zskiplistLevel
+}
+
+type zskiplistLevel struct {
+	forward *zskiplistNode
+	span    int64
+}
+
+type zskiplist struct {
+	header *zskiplistNode
+	tail   *zskiplistNode
+	length int64
+	level  int64
 }
 
 func initServer() {
