@@ -101,23 +101,37 @@ type redisObject struct {
 	ptr      *interface{}
 }
 
+/*
+*
+跳表节点的定义
+*/
 type zskiplistNode struct {
-	obj      *robj
-	score    float64
+	//记录元素的redis指针
+	obj *robj
+	//记录当前元素的数值，代表当前元素的优先级
+	score float64
+	//指向当前元素的前驱节点，即小于当前节点的元素
 	backward *zskiplistNode
-	level    []zskiplistLevel
+	//用一个zskiplistLevel数组维护本届点各层索引信息
+	level []zskiplistLevel
 }
 
 type zskiplistLevel struct {
+	//记录本层索引的前驱节点的指针
 	forward *zskiplistNode
-	span    int64
+	//标识节点的本层索引需要跨几步才能到达该节点
+	span int64
 }
 
 type zskiplist struct {
+	//指向跳表的头节点
 	header *zskiplistNode
-	tail   *zskiplistNode
+	//指向跳表的尾节点
+	tail *zskiplistNode
+	//维护跳表的长度
 	length int64
-	level  int
+	//维护跳表当前索引的最高高度
+	level int
 }
 
 func initServer() {
