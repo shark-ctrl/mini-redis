@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"math/rand"
 )
 
@@ -24,7 +23,7 @@ func zslCreate() *zskiplist {
 	return zsl
 }
 
-func zslCreateNode(level int64, score float64, obj *robj) *zskiplistNode {
+func zslCreateNode(level int, score float64, obj *robj) *zskiplistNode {
 	zn := new(zskiplistNode)
 	zn.level = make([]zskiplistLevel, level)
 	zn.score = score
@@ -37,7 +36,7 @@ func zslInsert(zsl *zskiplist, score float64, obj *robj) *zskiplistNode {
 	rank := make([]int64, ZSKIPLIST_MAXLEVEL)
 
 	x := zsl.header
-	var i int64
+	var i int
 
 	for i = zsl.level - 1; i >= 0; i-- {
 
@@ -57,7 +56,7 @@ func zslInsert(zsl *zskiplist, score float64, obj *robj) *zskiplistNode {
 		update[i] = x
 	}
 
-	level := rand.Int63n(ZSKIPLIST_MAXLEVEL)
+	level := zslRandomLevel()
 	if level > zsl.level {
 		for i := zsl.level; i < level; i++ {
 			rank[i] = 0
@@ -97,18 +96,26 @@ func zslInsert(zsl *zskiplist, score float64, obj *robj) *zskiplistNode {
 	return x
 }
 
+func zslRandomLevel() int {
+	level := 1
+	for rand.Float64() < ZSKIPLIST_P && level < ZSKIPLIST_MAXLEVEL {
+		level++
+	}
+	return level
+}
+
 func zslGetRank(zsl *zskiplist, score float64, obj *robj) int64 {
 	var rank int64
 
 	x := zsl.header
 	for i := zsl.level - 1; i >= 0; i-- {
-		if x.level[i].forward != nil &&
-			(x.level[i].forward.score < score || (x.level[i].forward.score == score && x.level[i].forward.obj.String() < obj.String())) {
+		for x.level[i].forward != nil &&
+			(x.level[i].forward.score < score || (x.level[i].forward.score == score && x.level[i].forward.obj.String() <= obj.String())) {
 			rank += x.level[i].span
 			x = x.level[i].forward
 		}
 
-		if x.level[i].forward.obj.String() == obj.String() {
+		if x.obj != nil && x.obj.String() == obj.String() {
 			return rank
 		}
 	}
@@ -120,14 +127,14 @@ func zslDelete(zsl *zskiplist, score float64, obj *robj) int64 {
 
 	x := zsl.header
 	for i := zsl.level - 1; i >= 0; i-- {
-		if x.level[i].forward != nil &&
+		for x.level[i].forward != nil &&
 			(x.level[i].forward.score < score || (x.level[i].forward.score == score && x.level[i].forward.obj.String() < obj.String())) {
 			x = x.level[i].forward
 		}
 		update[i] = x
 	}
 	x = x.level[0].forward
-	if x != nil && x.level[0].forward.obj.String() == obj.String() {
+	if x != nil && x.obj.String() == obj.String() {
 		zslDeleteNode(zsl, x, update)
 		return 1
 	}
@@ -136,7 +143,7 @@ func zslDelete(zsl *zskiplist, score float64, obj *robj) int64 {
 
 func zslDeleteNode(zsl *zskiplist, x *zskiplistNode, update []*zskiplistNode) {
 
-	var i int64
+	var i int
 	for i = 0; i < zsl.level; i++ {
 		if update[i].level[i].forward == x {
 
@@ -159,8 +166,4 @@ func zslDeleteNode(zsl *zskiplist, x *zskiplistNode, update []*zskiplistNode) {
 
 	zsl.length--
 
-}
-
-func (o *robj) String() string {
-	return fmt.Sprintf("%v", *o.ptr)
 }

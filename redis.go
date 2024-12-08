@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net"
 	"strings"
@@ -71,6 +72,7 @@ const (
 	REDIS_HASH_VALUE = 2
 
 	ZSKIPLIST_MAXLEVEL = 32
+	ZSKIPLIST_P        = 0.25
 )
 
 type redisServer struct {
@@ -115,7 +117,7 @@ type zskiplist struct {
 	header *zskiplistNode
 	tail   *zskiplistNode
 	length int64
-	level  int64
+	level  int
 }
 
 func initServer() {
@@ -248,4 +250,8 @@ func call(c *redisClient, flags int) {
 	c.cmd.proc(c)
 
 	//todo aof use flags
+}
+
+func (o *robj) String() string {
+	return fmt.Sprintf("%v", *o.ptr)
 }
