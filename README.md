@@ -113,6 +113,9 @@ mini-redis如何解析处理客户端请求
 
 动手复刻redis之go语言下的字典的设计与落地:<https://mp.weixin.qq.com/s?__biz=MzkwODYyNTM2MQ==&mid=2247486645&idx=1&sn=23a386c2fab95fbfd11b1b34ac1fbbcc&chksm=c0c6580bf7b1d11dde0655f93ae70265f16e8b693a0165d7b3144d9ac4d4a9d2c472b94b9d14#rd>
 
+
+Go 语言下的 Redis 跳表设计与实现:<https://mp.weixin.qq.com/s/9ygqb7399drvkSl-V0zuSA>
+
 ## 关于我
 
 Hi，我是 **sharkChili** ，是个不断在硬核技术上作死的技术人，是 **CSDN的博客专家** ，也是开源项目 **Java Guide** 的维护者之一，熟悉 **Java** 也会一点 **Go** ，偶尔也会在 **C源码** 边缘徘徊。写过很多有意思的技术博客，也还在研究并输出技术的路上，希望我的文章对你有帮助，非常欢迎你关注我的公众号： **写代码的SharkChili** 。
