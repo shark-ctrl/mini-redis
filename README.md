@@ -113,7 +113,6 @@ mini-redis如何解析处理客户端请求
 
 动手复刻redis之go语言下的字典的设计与落地:<https://mp.weixin.qq.com/s?__biz=MzkwODYyNTM2MQ==&mid=2247486645&idx=1&sn=23a386c2fab95fbfd11b1b34ac1fbbcc&chksm=c0c6580bf7b1d11dde0655f93ae70265f16e8b693a0165d7b3144d9ac4d4a9d2c472b94b9d14#rd>
 
-
 Go 语言下的 Redis 跳表设计与实现:<https://mp.weixin.qq.com/s/9ygqb7399drvkSl-V0zuSA>
 
 ## 关于我
