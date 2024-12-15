@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"math/rand"
 )
 
@@ -59,7 +60,7 @@ func zslInsert(zsl *zskiplist, score float64, obj *robj) *zskiplistNode {
 		1. 节点小于当前插入节点的score
 		2. 节点score一致，且元素值小于或者等于当前score
 		*/
-		if x.level[i].forward != nil &&
+		for x.level[i].forward != nil &&
 			(x.level[i].forward.score < score || (x.level[i].forward.score == score && x.level[i].forward.obj.String() < obj.String())) {
 			//记录本层索引前移跨度
 			rank[i] += x.level[i].span
@@ -196,5 +197,154 @@ func zslDeleteNode(zsl *zskiplist, x *zskiplistNode, update []*zskiplistNode) {
 	}
 	//维护跳表节点信息
 	zsl.length--
+
+}
+
+func zaddCommand(c *redisClient) {
+	zaddGenericCommand(c, 0)
+}
+
+func zaddGenericCommand(c *redisClient, incr int) {
+	key := c.argv[1]
+	var ele *robj
+	var zobj *robj
+	var j uint64
+	var score float64
+
+	var added int64
+	var updated int64
+	//参数非偶数，入参异常直接输出错误后返回
+	if c.argc%2 != 0 {
+		addReplyError(c, shared.syntaxerr)
+		return
+	}
+
+	elements := (c.argc - 2) / 2
+	scores := make([]float64, elements)
+
+	for j = 0; j < elements; j++ {
+		//对score进行转换，若报错直接返回
+		if !getDoubleFromObjectOrReply(c, c.argv[2+j*2], &scores[j], nil) {
+			return
+		}
+	}
+
+	//若为空则创建一个有序集合
+	zobj = lookupKeyWrite(c.db, c.argv[1])
+	if zobj == nil {
+		zobj = createZsetObject()
+		dbAdd(c.db, key, zobj)
+	} else if zobj.robjType != REDIS_ZSET {
+		addReply(c, shared.wrongtypeerr)
+		return
+	}
+
+	zs := (*zobj.ptr).(*zset)
+
+	for j = 0; j < elements; j++ {
+		score = scores[j]
+		ele = c.argv[3+j*2]
+
+		k := (*ele.ptr).(string)
+
+		if zs.dict[k] != nil {
+			curScore := zs.dict[k]
+			if *curScore != score {
+				zslDelete(zs.zsl, *curScore, c.argv[3+j*2])
+				zslInsert(zs.zsl, score, c.argv[3+j*2])
+				zs.dict[k] = &score
+				updated++
+			}
+
+		} else {
+			zslInsert(zs.zsl, score, c.argv[3+j*2])
+			zs.dict[k] = &score
+			added++
+		}
+
+	}
+
+	if zs.zsl.length > 0 {
+		x := zs.zsl.header
+		for i := 0; i < zs.zsl.level; i++ {
+			x = zs.zsl.header
+			for x != nil {
+				log.Print("node:", x.obj, " span:", x.level[i].span)
+				x = x.level[i].forward
+			}
+			log.Println("*********** level", i, " end ***********")
+		}
+
+	}
+	addReplyLongLong(c, added)
+
+}
+
+func zcardCommand(c *redisClient) {
+
+	zobj := lookupKeyReadOrReply(c, c.argv[1], shared.czero)
+	if zobj == nil || checkType(c, zobj, REDIS_ZSET) {
+		return
+	}
+	zs := (*zobj.ptr).(*zset)
+	addReplyLongLong(c, zs.zsl.length)
+}
+
+func zrankCommand(c *redisClient) {
+	zrankGenericCommand(c, 0)
+}
+
+func zrankGenericCommand(c *redisClient, reverse int) {
+	key := c.argv[1]
+	ele := c.argv[2]
+
+	o := lookupKeyReadOrReply(c, key, nil)
+	if o == nil || checkType(c, o, REDIS_ZSET) {
+		return
+	}
+
+	zs := (*o.ptr).(*zset)
+	llen := zs.zsl.length
+
+	k := (*ele.ptr).(string)
+	score, exists := zs.dict[k]
+	if exists {
+		rank := zslGetRank(zs.zsl, *score, ele)
+
+		if reverse == 1 {
+			addReplyLongLong(c, llen-rank)
+		} else {
+			addReplyLongLong(c, rank-1)
+		}
+	} else {
+		addReply(c, shared.nullbulk)
+	}
+
+}
+
+func zremCommand(c *redisClient) {
+	var deleted int64
+
+	o := lookupKeyWriteOrReply(c, c.argv[1], shared.czero)
+	if o == nil || checkType(c, o, REDIS_ZSET) {
+		return
+	}
+	zs := (*o.ptr).(*zset)
+
+	var j uint64
+	for j = 2; j < c.argc; j++ {
+		ele := (*c.argv[j].ptr).(string)
+		if zs.dict[ele] != nil {
+			deleted++
+			zslDelete(zs.zsl, *zs.dict[ele], c.argv[j])
+			delete(zs.dict, ele)
+
+			if len(zs.dict) == 0 {
+				dbDelete(c.db, c.argv[1])
+			}
+		}
+	}
+
+	addReplyLongLong(c, deleted)
 
 }

@@ -68,6 +68,18 @@ func createListObject() *robj {
 	return o
 }
 
+func createZsetObject() *robj {
+	zs := new(zset)
+	zs.dict = map[string]*float64{}
+	zs.zsl = zslCreate()
+
+	i := interface{}(zs)
+
+	o := createObject(REDIS_ZSET, &i)
+	o.encoding = REDIS_ENCODING_SKIPLIST
+	return o
+}
+
 func getLongFromObjectOrReply(c *redisClient, o *robj, target *int64, msg *string) bool {
 	value, err := strconv.ParseInt((*o.ptr).(string), 10, 64)
 
@@ -86,6 +98,19 @@ func getLongFromObjectOrReply(c *redisClient, o *robj, target *int64, msg *strin
 		}
 		return false
 	}
+	*target = value
+	return true
+}
+
+func getDoubleFromObjectOrReply(c *redisClient, o *robj, target *float64, msg *string) bool {
+	value, err := strconv.ParseFloat((*o.ptr).(string), 64)
+
+	if err != nil {
+		errMsg := "value is not a valid float"
+		addReplyError(c, &errMsg)
+		return false
+	}
+
 	*target = value
 	return true
 }

@@ -33,6 +33,10 @@ var redisCommandTable = []redisCommand{
 	{name: "HMGET", proc: hmgetCommand, arity: -3, sflag: "r", flag: 0},
 	{name: "HGETALL", proc: hgetallCommand, arity: 2, sflag: "r", flag: 0},
 	{name: "HDEL", proc: hdelCommand, arity: -3, sflag: "wF", flag: 0},
+	{name: "ZADD", proc: zaddCommand, arity: -4, sflag: "wmF", flag: 0},
+	{name: "ZREM", proc: zremCommand, arity: -3, sflag: "wF", flag: 0},
+	{name: "ZCARD", proc: zcardCommand, arity: 2, sflag: "rF", flag: 0},
+	{name: "ZRANK", proc: zrankCommand, arity: 3, sflag: "rF", flag: 0},
 }
 var shared sharedObjectsStruct
 

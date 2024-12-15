@@ -134,6 +134,14 @@ type zskiplist struct {
 	level int
 }
 
+/*
+有序集合结构体
+*/
+type zset struct {
+	dict map[string]*float64
+	zsl  *zskiplist
+}
+
 func initServer() {
 	log.Println("init redis server")
 	server.ip = "localhost"
