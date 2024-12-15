@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"math/rand"
 )
 
@@ -201,27 +200,32 @@ func zslDeleteNode(zsl *zskiplist, x *zskiplistNode, update []*zskiplistNode) {
 }
 
 func zaddCommand(c *redisClient) {
+	//传入0，即本次传入的score在元素存在情况下执行覆盖score而非累加score
 	zaddGenericCommand(c, 0)
 }
 
 func zaddGenericCommand(c *redisClient, incr int) {
+	//拿到有序集合的key
 	key := c.argv[1]
+
 	var ele *robj
 	var zobj *robj
 	var j uint64
 	var score float64
-
+	//初始化变量记录本次操作添加和更新的元素数
 	var added int64
 	var updated int64
+
 	//参数非偶数，入参异常直接输出错误后返回
 	if c.argc%2 != 0 {
 		addReplyError(c, shared.syntaxerr)
 		return
 	}
-
+	//减去zadd和key 再除去2 得到本次插入的元素数
 	elements := (c.argc - 2) / 2
-	scores := make([]float64, elements)
 
+	//创建scores记录每个元素对应的score值
+	scores := make([]float64, elements)
 	for j = 0; j < elements; j++ {
 		//对score进行转换，若报错直接返回
 		if !getDoubleFromObjectOrReply(c, c.argv[2+j*2], &scores[j], nil) {
@@ -229,63 +233,60 @@ func zaddGenericCommand(c *redisClient, incr int) {
 		}
 	}
 
-	//若为空则创建一个有序集合
+	//若为空则创建一个有序集合,并添加到数据库中
 	zobj = lookupKeyWrite(c.db, c.argv[1])
 	if zobj == nil {
 		zobj = createZsetObject()
 		dbAdd(c.db, key, zobj)
-	} else if zobj.robjType != REDIS_ZSET {
+	} else if zobj.robjType != REDIS_ZSET { //若类型不对则返回异常
 		addReply(c, shared.wrongtypeerr)
 		return
 	}
 
 	zs := (*zobj.ptr).(*zset)
 
+	//基于元素数遍历集合
 	for j = 0; j < elements; j++ {
+		//拿到本次元素对应的score
 		score = scores[j]
+		//拿到对应的元素
 		ele = c.argv[3+j*2]
-
 		k := (*ele.ptr).(string)
 
+		//如果该元素存在于字典中
 		if zs.dict[k] != nil {
+			//拿到当前元素对应的score
 			curScore := zs.dict[k]
+			//若不一样则更新字典中对应元素的score，并将该元素从跳表中删除再插入
 			if *curScore != score {
 				zslDelete(zs.zsl, *curScore, c.argv[3+j*2])
 				zslInsert(zs.zsl, score, c.argv[3+j*2])
 				zs.dict[k] = &score
+				//维护更新数
 				updated++
 			}
 
-		} else {
+		} else { //若是新增则插入到有序集合对应的跳表和字典中
 			zslInsert(zs.zsl, score, c.argv[3+j*2])
 			zs.dict[k] = &score
+			//维护添加数
 			added++
 		}
 
 	}
 
-	if zs.zsl.length > 0 {
-		x := zs.zsl.header
-		for i := 0; i < zs.zsl.level; i++ {
-			x = zs.zsl.header
-			for x != nil {
-				log.Print("node:", x.obj, " span:", x.level[i].span)
-				x = x.level[i].forward
-			}
-			log.Println("*********** level", i, " end ***********")
-		}
-
-	}
+	//返回本次插入数
 	addReplyLongLong(c, added)
 
 }
 
 func zcardCommand(c *redisClient) {
-
+	//限定为有序集合是否存在且类型是否为有序集合
 	zobj := lookupKeyReadOrReply(c, c.argv[1], shared.czero)
 	if zobj == nil || checkType(c, zobj, REDIS_ZSET) {
 		return
 	}
+	//拿到其底层的跳表返回元素数
 	zs := (*zobj.ptr).(*zset)
 	addReplyLongLong(c, zs.zsl.length)
 }
@@ -295,28 +296,33 @@ func zrankCommand(c *redisClient) {
 }
 
 func zrankGenericCommand(c *redisClient, reverse int) {
+	//从参数中拿到有序集合的key和本次要查看排名的元素
 	key := c.argv[1]
 	ele := c.argv[2]
 
+	//查看有序集合是否存在
 	o := lookupKeyReadOrReply(c, key, nil)
 	if o == nil || checkType(c, o, REDIS_ZSET) {
 		return
 	}
-
+	//获取有序集合底层的跳表的长度
 	zs := (*o.ptr).(*zset)
 	llen := zs.zsl.length
-
+	//查看元素在字典中是否存在
 	k := (*ele.ptr).(string)
 	score, exists := zs.dict[k]
+	//如果存在则查看其在跳表中的排名
 	if exists {
+		//zslGetRank返回元素从头节点开始算经过的步数，例如aa是第一个元素，那么header走到它需要跨1步，所以返回1
 		rank := zslGetRank(zs.zsl, *score, ele)
-
+		//如果要返回倒叙结果则基于长度减去rank
 		if reverse == 1 {
 			addReplyLongLong(c, llen-rank)
 		} else {
+			//将rank减去1得到元素实际的索引值
 			addReplyLongLong(c, rank-1)
 		}
-	} else {
+	} else { //不存在返回空
 		addReply(c, shared.nullbulk)
 	}
 
@@ -324,7 +330,7 @@ func zrankGenericCommand(c *redisClient, reverse int) {
 
 func zremCommand(c *redisClient) {
 	var deleted int64
-
+	//检查有序集合是否存在且类型是否是有序集合类型，如果为空或者类型不一致则返回
 	o := lookupKeyWriteOrReply(c, c.argv[1], shared.czero)
 	if o == nil || checkType(c, o, REDIS_ZSET) {
 		return
@@ -332,19 +338,24 @@ func zremCommand(c *redisClient) {
 	zs := (*o.ptr).(*zset)
 
 	var j uint64
+	//遍历元素
 	for j = 2; j < c.argc; j++ {
+		//拿到元素字符串
 		ele := (*c.argv[j].ptr).(string)
+		//如果不为空则将其从底层字典和跳表中删除
 		if zs.dict[ele] != nil {
+			//更新删除结果
 			deleted++
 			zslDelete(zs.zsl, *zs.dict[ele], c.argv[j])
 			delete(zs.dict, ele)
 
+			//如果发现字典为空，说明有序集合没有元素了，直接将该有序集合从字典中期删除
 			if len(zs.dict) == 0 {
 				dbDelete(c.db, c.argv[1])
 			}
 		}
 	}
-
+	//返回删除数
 	addReplyLongLong(c, deleted)
 
 }
