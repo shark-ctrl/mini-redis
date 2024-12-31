@@ -57,14 +57,14 @@ PONG
 
 后续开发计划:
 
-+ [ ] 字典数据结构开发
++ [x] 字典数据结构开发
 + [x] 列表底层数据结构双向链表
-+ [ ] 有序集合等数据结构开发
++ [x] 有序集合等数据结构开发
 + [x] 字符串常规`GET`指令开发调测
 + [x] 字符串`SET`指令开发调测
 + [x] 列表操作LINDEX、LPOP、RPUSH、LRANGE指令开发
 + [x] 字典操作HSET、HMSET、HSETNX、HGET、HMGET、HGETALL、HDEL指令开发
-+ [ ] 有序集合所有操作指令开发
++ [x] 有序集合所有操作指令开发
 + [ ] `AOF`持久化和重载机制
 + [ ] `LRU`缓存置换算法
 + [ ] 性能压测
@@ -114,6 +114,8 @@ mini-redis如何解析处理客户端请求
 动手复刻redis之go语言下的字典的设计与落地:<https://mp.weixin.qq.com/s?__biz=MzkwODYyNTM2MQ==&mid=2247486645&idx=1&sn=23a386c2fab95fbfd11b1b34ac1fbbcc&chksm=c0c6580bf7b1d11dde0655f93ae70265f16e8b693a0165d7b3144d9ac4d4a9d2c472b94b9d14#rd>
 
 Go 语言下的 Redis 跳表设计与实现:<https://mp.weixin.qq.com/s/9ygqb7399drvkSl-V0zuSA>
+
+Go 语言版 Redis 有序集合指令复刻探索:<https://mp.weixin.qq.com/s/u46O5HNopskSQtml2MHIow>
 
 ## 关于我
 
