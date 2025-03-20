@@ -39,6 +39,7 @@ var redisCommandTable = []redisCommand{
 	{name: "ZCARD", proc: zcardCommand, arity: 2, sflag: "rF", flag: 0},
 	{name: "ZRANK", proc: zrankCommand, arity: 3, sflag: "rF", flag: 0},
 	{name: "INCR", proc: incrCommand, arity: 2, sflag: "wmF", flag: 0},
+	{name: "DECR", proc: decrCommand, arity: 2, sflag: "wmF", flag: 0},
 }
 var shared sharedObjectsStruct
 
@@ -148,6 +149,10 @@ func incrCommand(c *redisClient) {
 	incrDecrCommand(c, 1)
 }
 
+func decrCommand(c *redisClient) {
+	incrDecrCommand(c, -1)
+}
+
 func incrDecrCommand(c *redisClient, incr int64) {
 	var value int64
 	var oldValue int64
@@ -161,8 +166,10 @@ func incrDecrCommand(c *redisClient, incr int64) {
 	var s string
 	if o == nil {
 		s = ""
-	} else {
+	} else if isString(*o.ptr) {
 		s = (*o.ptr).(string)
+	} else {
+		s = strconv.FormatInt((*o.ptr).(int64), 10)
 	}
 
 	if getLongLongFromObjectOrReply(c, s, &value, nil) != REDIS_OK {
@@ -197,6 +204,11 @@ func incrDecrCommand(c *redisClient, incr int64) {
 	reply := *shared.colon + strconv.FormatInt(value, 10) + *shared.crlf
 	addReply(c, &reply)
 
+}
+
+func isString(x interface{}) bool {
+	_, ok := x.(string)
+	return ok
 }
 
 func createSharedObjects() {
