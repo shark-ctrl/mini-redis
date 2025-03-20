@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -37,6 +38,7 @@ var redisCommandTable = []redisCommand{
 	{name: "ZREM", proc: zremCommand, arity: -3, sflag: "wF", flag: 0},
 	{name: "ZCARD", proc: zcardCommand, arity: 2, sflag: "rF", flag: 0},
 	{name: "ZRANK", proc: zrankCommand, arity: 3, sflag: "rF", flag: 0},
+	{name: "INCR", proc: incrCommand, arity: 2, sflag: "wmF", flag: 0},
 }
 var shared sharedObjectsStruct
 
@@ -50,6 +52,7 @@ type sharedObjectsStruct struct {
 	wrongtypeerr   *string
 	czero          *string
 	cone           *string
+	colon          *string
 	emptymultibulk *string
 	integers       [REDIS_SHARED_INTEGERS]*robj
 	bulkhdr        [REDIS_SHARED_BULKHDR_LEN]*robj
@@ -141,6 +144,61 @@ func setGenericCommand(c *redisClient, flags int, key *robj, val *robj, expire s
 	addReply(c, shared.ok)
 }
 
+func incrCommand(c *redisClient) {
+	incrDecrCommand(c, 1)
+}
+
+func incrDecrCommand(c *redisClient, incr int64) {
+	var value int64
+	var oldValue int64
+	var newObj *robj
+	o := lookupKeyWrite(c.db, c.argv[1])
+
+	if o != nil && checkType(c, o, REDIS_STRING) {
+		return
+	}
+
+	var s string
+	if o == nil {
+		s = ""
+	} else {
+		s = (*o.ptr).(string)
+	}
+
+	if getLongLongFromObjectOrReply(c, s, &value, nil) != REDIS_OK {
+		return
+	}
+
+	oldValue = value
+
+	if (incr < 0 && oldValue < 0 && incr < (math.MinInt64-oldValue)) ||
+		(incr > 0 && oldValue > 0 && incr > (math.MaxInt64-oldValue)) {
+		errReply := "increment or decrement would overflow"
+		addReplyError(c, &errReply)
+		return
+	}
+
+	value += incr
+
+	if o != nil &&
+		(value < 0 || value >= REDIS_SHARED_INTEGERS) &&
+		(value > math.MinInt64 || value < math.MaxInt64) {
+		newObj = o
+
+		i := interface{}(value)
+		o.ptr = &i
+	} else if o != nil {
+		newObj = createStringObjectFromLongLong(value)
+		dbOverwrite(c.db, c.argv[1], newObj)
+	} else {
+		newObj = createStringObjectFromLongLong(value)
+		dbAdd(c.db, c.argv[1], newObj)
+	}
+	reply := *shared.colon + strconv.FormatInt(value, 10) + *shared.crlf
+	addReply(c, &reply)
+
+}
+
 func createSharedObjects() {
 	crlf := "\r\n"
 	ok := "+OK\r\n"
@@ -151,6 +209,7 @@ func createSharedObjects() {
 	wrongtypeerr := "-WRONGTYPE Operation against a key holding the wrong kind of value\r\n"
 	czero := ":0\r\n"
 	cone := ":1\r\n"
+	colon := ":"
 	emptymultibulk := "*0\r\n"
 
 	shared = sharedObjectsStruct{
@@ -163,6 +222,7 @@ func createSharedObjects() {
 		wrongtypeerr:   &wrongtypeerr,
 		czero:          &czero,
 		cone:           &cone,
+		colon:          &colon,
 		emptymultibulk: &emptymultibulk,
 	}
 

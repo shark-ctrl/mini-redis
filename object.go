@@ -11,6 +11,19 @@ const (
 	REDIS_ERR = -1
 )
 
+func createStringObjectFromLongLong(value int64) *robj {
+	var o *robj
+	if value >= 0 && value < REDIS_SHARED_INTEGERS {
+		o = shared.integers[value]
+	} else if value >= math.MinInt64 && value < math.MaxInt64 {
+		o = createObject(REDIS_STRING, nil)
+		o.encoding = REDIS_ENCODING_INT
+		i := interface{}(value)
+		o.ptr = &i
+	}
+	return o
+}
+
 func createStringObject(ptr *string, len int) *robj {
 	return createEmbeddedStringObject(ptr, len)
 }
@@ -125,6 +138,11 @@ func checkType(c *redisClient, o *robj, rType int) bool {
 
 func getLongLongFromObjectOrReply(c *redisClient, expire string, target *int64, msg *string) int {
 	var value int64
+
+	if len(expire) == 0 {
+		return 0
+	}
+
 	value, err := strconv.ParseInt(expire, 10, 64)
 	if err != nil {
 		addReply(c, shared.err)

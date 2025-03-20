@@ -75,6 +75,10 @@ func dbAdd(db *redisDb, key *robj, val *robj) {
 	db.dict[(*key.ptr).(string)] = val
 }
 
+func dbOverwrite(db *redisDb, key *robj, val *robj) {
+	db.dict[(*key.ptr).(string)] = val
+}
+
 func dbDelete(db *redisDb, key *robj) int64 {
 	delete(db.dict, (*key.ptr).(string))
 	return 1
