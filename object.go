@@ -129,6 +129,7 @@ func getDoubleFromObjectOrReply(c *redisClient, o *robj, target *float64, msg *s
 }
 
 func checkType(c *redisClient, o *robj, rType int) bool {
+	//如果类型不一致，则输出-WRONGTYPE Operation against a key holding the wrong kind of value
 	if o.robjType != rType {
 		addReply(c, shared.wrongtypeerr)
 		return true

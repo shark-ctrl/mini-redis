@@ -55,7 +55,7 @@ type sharedObjectsStruct struct {
 	cone           *string
 	colon          *string
 	emptymultibulk *string
-	integers       [REDIS_SHARED_INTEGERS]*robj
+	integers       [REDIS_SHARED_INTEGERS]*robj //通用0~9999常量数值池
 	bulkhdr        [REDIS_SHARED_BULKHDR_LEN]*robj
 }
 
@@ -146,10 +146,12 @@ func setGenericCommand(c *redisClient, flags int, key *robj, val *robj, expire s
 }
 
 func incrCommand(c *redisClient) {
+	//累加1
 	incrDecrCommand(c, 1)
 }
 
 func decrCommand(c *redisClient) {
+	//递减1
 	incrDecrCommand(c, -1)
 }
 
@@ -157,12 +159,18 @@ func incrDecrCommand(c *redisClient, incr int64) {
 	var value int64
 	var oldValue int64
 	var newObj *robj
+	//查看键值对是否存在
 	o := lookupKeyWrite(c.db, c.argv[1])
-
+	//如果键值对存在且类型非字符串类型，直接响应错误并返回
 	if o != nil && checkType(c, o, REDIS_STRING) {
 		return
 	}
-
+	/**
+	针对字符串类型的值进行如下判断的和转换：
+	1. 如果为空，说明本次的key不存在，直接初始化一个空字符串，后续会直接初始化一个0值使用
+	2. 如果是字符串类型，则转为字符串类型
+	3. 如果是数值类型，则先转为字符串类型进行后续的通用数值转换操作保证一致性
+	*/
 	var s string
 	if o == nil {
 		s = ""
@@ -171,7 +179,7 @@ func incrDecrCommand(c *redisClient, incr int64) {
 	} else {
 		s = strconv.FormatInt((*o.ptr).(int64), 10)
 	}
-
+	//进行类型强转为数值，如果失败，直接输出错误并返回
 	if getLongLongFromObjectOrReply(c, s, &value, nil) != REDIS_OK {
 		return
 	}
@@ -184,9 +192,9 @@ func incrDecrCommand(c *redisClient, incr int64) {
 		addReplyError(c, &errReply)
 		return
 	}
-
+	//基于incr累加的值生成value
 	value += incr
-
+	//如果超常量池范围则封装一个对象使用
 	if o != nil &&
 		(value < 0 || value >= REDIS_SHARED_INTEGERS) &&
 		(value > math.MinInt64 || value < math.MaxInt64) {
@@ -194,13 +202,15 @@ func incrDecrCommand(c *redisClient, incr int64) {
 
 		i := interface{}(value)
 		o.ptr = &i
-	} else if o != nil {
+	} else if o != nil { //如果对象存在，且累加结果没超范围则调用createStringObjectFromLongLong获取常量对象
 		newObj = createStringObjectFromLongLong(value)
+		//将写入结果覆盖
 		dbOverwrite(c.db, c.argv[1], newObj)
-	} else {
+	} else { //从常量池获取数值，然后添加键值对到数据库中
 		newObj = createStringObjectFromLongLong(value)
 		dbAdd(c.db, c.argv[1], newObj)
 	}
+	//将累加后的结果返回给客户端，按照RESP格式即 :数值\r\n,例如返回10 那么格式就是:10\r\n
 	reply := *shared.colon + strconv.FormatInt(value, 10) + *shared.crlf
 	addReply(c, &reply)
 
@@ -239,9 +249,13 @@ func createSharedObjects() {
 	}
 
 	var i int64
+	//初始化常量池对象
 	for i = 0; i < REDIS_SHARED_INTEGERS; i++ {
+		//基于接口封装数值
 		num := interface{}(i)
+		//生成string对象
 		shared.integers[i] = createObject(REDIS_STRING, &num)
+		//声明编码类型为int
 		shared.integers[i].encoding = REDIS_ENCODING_INT
 	}
 
