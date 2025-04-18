@@ -117,6 +117,8 @@ Go 语言下的 Redis 跳表设计与实现:<https://mp.weixin.qq.com/s/9ygqb739
 
 Go 语言版 Redis 有序集合指令复刻探索:<https://mp.weixin.qq.com/s/u46O5HNopskSQtml2MHIow>
 
+mini-redis复刻Redis的INCR指令:<https://mp.weixin.qq.com/s/BwACqJvE8krYA-dglmxrMw>
+
 ## 关于我
 
 Hi，我是 **sharkChili** ，是个不断在硬核技术上作死的技术人，是 **CSDN的博客专家** ，也是开源项目 **Java Guide** 的维护者之一，熟悉 **Java** 也会一点 **Go** ，偶尔也会在 **C源码** 边缘徘徊。写过很多有意思的技术博客，也还在研究并输出技术的路上，希望我的文章对你有帮助，非常欢迎你关注我的公众号： **写代码的SharkChili** 。
