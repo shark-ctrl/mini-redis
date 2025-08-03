@@ -731,20 +731,30 @@ func scanGenericCommand(c *redisClient, o *robj, cursor *uint64) {
 	ht = c.db.dict
 	if ht != nil {
 		j := int64(0)
+		skip := int64(0)
 
 		for k := range ht {
+			if skip < int64(*cursor) {
+				skip++
+				continue
+			}
 			key := interface{}(k)
 			listAddNodeTail(keys, &key)
 			j++
 			if j == count {
-				*cursor = uint64(j + 1)
+				*cursor = uint64(skip + count)
 				break
 			}
 		}
 	}
 
 	addReplyMultiBulkLen(c, 2)
-	addReplyLongLong(c, int64(*cursor))
+	if listLength(keys) != 0 {
+		addReplyLongLong(c, int64(*cursor))
+	} else {
+		addReplyLongLong(c, 0)
+	}
+
 	addReplyMultiBulkLen(c, listLength(keys))
 	for true {
 		node := listFirst(keys)
