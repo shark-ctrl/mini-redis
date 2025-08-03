@@ -40,6 +40,7 @@ var redisCommandTable = []redisCommand{
 	{name: "ZRANK", proc: zrankCommand, arity: 3, sflag: "rF", flag: 0},
 	{name: "INCR", proc: incrCommand, arity: 2, sflag: "wmF", flag: 0},
 	{name: "DECR", proc: decrCommand, arity: 2, sflag: "wmF", flag: 0},
+	{name: "SCAN", proc: scanCommand, arity: -2, sflag: "rR", flag: 0},
 }
 var shared sharedObjectsStruct
 
@@ -674,4 +675,90 @@ func hdelCommand(c *redisClient) {
 
 	addReplyLongLong(c, deleted)
 
+}
+
+func scanCommand(c *redisClient) {
+	var cursor uint64
+	if !parseScanCursorOrReply(c, c.argv[1], &cursor) {
+		return
+	}
+	scanGenericCommand(c, nil, &cursor)
+
+}
+
+func parseScanCursorOrReply(c *redisClient, o *robj, cursor *uint64) bool {
+
+	u, err := strconv.ParseUint((*o.ptr).(string), 10, 64)
+	if err != nil {
+		errReply := "invalid cursor"
+		addReplyError(c, &errReply)
+		return false
+	}
+	*cursor = u
+	return true
+}
+
+func scanGenericCommand(c *redisClient, o *robj, cursor *uint64) {
+	keys := listCreate()
+	var count int64
+	count = 10
+	var ht map[string]*robj
+
+	var i uint64
+	//判断是scan还是hscan等标识
+	if o == nil {
+		i = 2
+	} else {
+		i = 3
+	}
+	//参数解析
+	for ; i < c.argc; i += 2 {
+		j := c.argc - i
+		if "count" == (*c.argv[i].ptr).(string) && j >= 2 {
+			//解析count的值，若不合法直接执行后置清理
+			if !getLongFromObjectOrReply(c, c.argv[i+1], &count, nil) {
+				goto cleanup
+			}
+
+			if count < 1 {
+				addReply(c, shared.syntaxerr)
+				goto cleanup
+			}
+
+		}
+	}
+	//迭代key值
+	ht = c.db.dict
+	if ht != nil {
+		j := int64(0)
+
+		for k := range ht {
+			key := interface{}(k)
+			listAddNodeTail(keys, &key)
+			j++
+			if j == count {
+				*cursor = uint64(j + 1)
+				break
+			}
+		}
+	}
+
+	addReplyMultiBulkLen(c, 2)
+	addReplyLongLong(c, int64(*cursor))
+	addReplyMultiBulkLen(c, listLength(keys))
+	for true {
+		node := listFirst(keys)
+		if node == nil {
+			break
+		}
+
+		o := new(robj)
+		o.ptr = node.value
+		addReplyBulk(c, o)
+		listDelNode(keys, node)
+	}
+
+cleanup:
+	//清理资源
+	listRelease(keys)
 }

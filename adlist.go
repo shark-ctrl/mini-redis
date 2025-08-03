@@ -164,3 +164,16 @@ func listIndex(l *list, index int64) *listNode {
 
 	return n
 }
+
+func listLength(l *list) int64 {
+	return l.len
+}
+
+func listFirst(l *list) *listNode {
+	return l.head
+
+}
+
+func listRelease(l *list) {
+	l = nil
+}
