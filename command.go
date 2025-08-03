@@ -751,9 +751,8 @@ func scanGenericCommand(c *redisClient, o *robj, cursor *uint64) {
 		if node == nil {
 			break
 		}
-
-		o := new(robj)
-		o.ptr = node.value
+		s := (*node.value).(string)
+		o := createEmbeddedStringObject(&s, len(s))
 		addReplyBulk(c, o)
 		listDelNode(keys, node)
 	}
