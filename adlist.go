@@ -174,6 +174,6 @@ func listFirst(l *list) *listNode {
 
 }
 
-func listRelease(l *list) {
-	l = nil
+func listRelease(l **list) {
+	*l = nil
 }

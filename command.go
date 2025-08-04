@@ -769,5 +769,5 @@ func scanGenericCommand(c *redisClient, o *robj, cursor *uint64) {
 
 cleanup:
 	//清理资源
-	listRelease(keys)
+	listRelease(&keys)
 }
