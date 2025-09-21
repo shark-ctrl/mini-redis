@@ -24,22 +24,25 @@ type BucketElement struct {
 }
 
 // GetBucketCount 返回map中的bucket数量。
-// 注意：此实现是一个简化的版本，返回默认的bucket数量8。
-// 在真实实现中，这会访问Go运行时的hmap结构来获取实际的bucket数量。
+// 注意：此实现是一个简化的版本，仅用于演示目的。
+// 在真实的Go运行时中，map的bucket数量是动态调整的，取决于map的大小和负载因子。
+// 真实实现会访问Go运行时的hmap结构来获取实际的bucket数量。
+// 当前实现始终返回8，这并不代表真实Go map的行为。
 func (du *DictUtil) GetBucketCount(m interface{}) (int, error) {
-	// 检查输入参数
+	// 检查输入参数是否为nil
 	if m == nil {
 		return 0, fmt.Errorf("map不能为空")
 	}
 
-	// 使用反射检查map
+	// 使用反射检查输入是否为map类型
 	mapValue := reflect.ValueOf(m)
 	if mapValue.Kind() != reflect.Map {
 		return 0, fmt.Errorf("输入的参数不是map类型")
 	}
 
-	// 在简化实现中，我们假设Go map默认有8个bucket
-	// 在真实实现中，bucket数量是2的B次方（2^B）
+	// 简化实现：返回固定的bucket数量8
+	// 注意：真实的Go map实现中，bucket数量是2的B次方（2^B），其中B是hmap结构中的一个字段
+	// 随着map中元素的增加，bucket数量会动态增长
 	return 8, nil
 }
 
