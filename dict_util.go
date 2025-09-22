@@ -38,11 +38,11 @@ func getBucketCount(m map[string]*redisObject) (int, error) {
 	return 1 << *BPtr, nil // 2^B
 }
 
-// inspectMapBucket 检查Redis对象字典中指定索引的bucket
+// getElementsInBucketIndex 获取Redis对象字典中根据索引分配的元素
 // 参数m: Redis对象字典
 // 参数bucketIndex: bucket索引
-// 返回值: 指定bucket中的键值对元素列表
-func inspectMapBucket(m map[string]*redisObject, bucketIndex int) ([]bucketElement, error) {
+// 返回值: 根据索引分配的键值对元素列表
+func getElementsInBucketIndex(m map[string]*redisObject, bucketIndex int) ([]bucketElement, error) {
 	mapValue, err := validateMap(m)
 	if err != nil {
 		return nil, err
@@ -80,10 +80,10 @@ func inspectMapBucket(m map[string]*redisObject, bucketIndex int) ([]bucketEleme
 	return elements, nil
 }
 
-// inspectAllMapBuckets 检查Redis对象字典中的所有buckets
+// getAllElementsInBuckets 获取Redis对象字典中所有bucket的元素
 // 参数m: Redis对象字典
 // 返回值: 所有bucket中的键值对元素列表
-func inspectAllMapBuckets(m map[string]*redisObject) ([][]bucketElement, error) {
+func getAllElementsInBuckets(m map[string]*redisObject) ([][]bucketElement, error) {
 	mapValue, err := validateMap(m)
 	if err != nil {
 		return nil, err
