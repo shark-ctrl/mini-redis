@@ -38,10 +38,11 @@ func getBucketCount(m map[string]*redisObject) (int, error) {
 	return 1 << *BPtr, nil // 2^B
 }
 
-// getElementsInBucketIndex 获取Redis对象字典中根据索引分配的元素
+// getElementsInBucketIndex 获取Redis对象字典中根据索引模拟分配的元素
+// 注意：此函数使用简化的逻辑模拟bucket分配，而不是真正访问Go map底层的bucket结构
 // 参数m: Redis对象字典
-// 参数bucketIndex: bucket索引
-// 返回值: 根据索引分配的键值对元素列表
+// 参数bucketIndex: bucket索引（0-7）
+// 返回值: 根据索引模拟分配的键值对元素列表
 func getElementsInBucketIndex(m map[string]*redisObject, bucketIndex int) ([]bucketElement, error) {
 	mapValue, err := validateMap(m)
 	if err != nil {
@@ -81,6 +82,7 @@ func getElementsInBucketIndex(m map[string]*redisObject, bucketIndex int) ([]buc
 }
 
 // getAllElementsInBuckets 获取Redis对象字典中所有bucket的元素
+// 注意：此函数使用简化的逻辑模拟bucket分配，而不是真正访问Go map底层的bucket结构
 // 参数m: Redis对象字典
 // 返回值: 所有bucket中的键值对元素列表
 func getAllElementsInBuckets(m map[string]*redisObject) ([][]bucketElement, error) {
