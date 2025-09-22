@@ -23,21 +23,29 @@ type BucketElement struct {
 	Value interface{}
 }
 
+// validateMap 验证输入参数是否为有效的map
+func (du *DictUtil) validateMap(m interface{}) (reflect.Value, error) {
+	if m == nil {
+		return reflect.Value{}, fmt.Errorf("map不能为空")
+	}
+
+	mapValue := reflect.ValueOf(m)
+	if mapValue.Kind() != reflect.Map {
+		return reflect.Value{}, fmt.Errorf("输入的参数不是map类型")
+	}
+
+	return mapValue, nil
+}
+
 // GetBucketCount 返回map中的bucket数量。
 // 注意：此实现是一个简化的版本，仅用于演示目的。
 // 在真实的Go运行时中，map的bucket数量是动态调整的，取决于map的大小和负载因子。
 // 真实实现会访问Go运行时的hmap结构来获取实际的bucket数量。
 // 当前实现始终返回8，这并不代表真实Go map的行为。
 func (du *DictUtil) GetBucketCount(m interface{}) (int, error) {
-	// 检查输入参数是否为nil
-	if m == nil {
-		return 0, fmt.Errorf("map不能为空")
-	}
-
-	// 使用反射检查输入是否为map类型
-	mapValue := reflect.ValueOf(m)
-	if mapValue.Kind() != reflect.Map {
-		return 0, fmt.Errorf("输入的参数不是map类型")
+	_, err := du.validateMap(m)
+	if err != nil {
+		return 0, err
 	}
 
 	// 简化实现：返回固定的bucket数量8
@@ -50,15 +58,9 @@ func (du *DictUtil) GetBucketCount(m interface{}) (int, error) {
 // 注意：此实现是一个简化的版本，使用反射来模拟bucket结构。
 // 在真实实现中，这会访问Go运行时的hmap结构来获取bucket信息。
 func (du *DictUtil) InspectMapBucket(m interface{}, bucketIndex int) ([]BucketElement, error) {
-	// 检查输入参数
-	if m == nil {
-		return nil, fmt.Errorf("map不能为空")
-	}
-
-	// 使用反射检查map
-	mapValue := reflect.ValueOf(m)
-	if mapValue.Kind() != reflect.Map {
-		return nil, fmt.Errorf("输入的参数不是map类型")
+	mapValue, err := du.validateMap(m)
+	if err != nil {
+		return nil, err
 	}
 
 	// 检查空map
@@ -94,15 +96,9 @@ func (du *DictUtil) InspectMapBucket(m interface{}, bucketIndex int) ([]BucketEl
 // InspectAllMapBuckets 检查map中的所有buckets。
 // 注意：此实现是一个简化的版本，使用反射来模拟bucket结构。
 func (du *DictUtil) InspectAllMapBuckets(m interface{}) ([][]BucketElement, error) {
-	// 检查输入参数
-	if m == nil {
-		return nil, fmt.Errorf("map不能为空")
-	}
-
-	// 使用反射检查map
-	mapValue := reflect.ValueOf(m)
-	if mapValue.Kind() != reflect.Map {
-		return nil, fmt.Errorf("输入的参数不是map类型")
+	mapValue, err := du.validateMap(m)
+	if err != nil {
+		return nil, err
 	}
 
 	// 检查空map
