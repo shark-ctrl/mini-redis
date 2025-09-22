@@ -3,8 +3,11 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"log"
 	"reflect"
+	"unsafe"
 )
 
 // bucketElement 表示存储在Redis字典bucket中的键值对。
@@ -13,40 +16,33 @@ type bucketElement struct {
 	Value interface{}
 }
 
-// validateMap 验证输入的Redis对象字典是否有效
-// 参数m: 待验证的Redis对象字典
-// 返回值: 字典的反射值和错误信息
-func validateMap(m map[string]*robj) (reflect.Value, error) {
-	if m == nil {
-		return reflect.Value{}, fmt.Errorf("字典不能为空")
-	}
-
-	mapValue := reflect.ValueOf(m)
-	if mapValue.Kind() != reflect.Map {
-		return reflect.Value{}, fmt.Errorf("输入参数不是有效的字典类型")
-	}
-
-	return mapValue, nil
-}
-
 // getBucketCount 获取Redis对象字典的bucket数量
 // 参数m: Redis对象字典
-// 返回值: bucket数量(简化实现固定返回8)
-func getBucketCount(m map[string]*robj) (int, error) {
+// 返回值: bucket数量
+func getBucketCount(m map[string]*redisObject) (int, error) {
 	_, err := validateMap(m)
 	if err != nil {
 		return 0, err
 	}
 
-	// 简化实现：返回固定的bucket数量8
-	return 8, nil
+	// 使用反射获取map的bucket数量
+	mapValue := reflect.ValueOf(m)
+
+	// 获取map指针
+	mapPtr := mapValue.UnsafePointer()
+	mapPtrUint := uintptr(mapPtr)
+
+	// 访问B字段（偏移量9）- bucket数量的对数
+	// 在Go 1.23.9版本中，B字段的偏移量是9字节
+	BPtr := (*uint8)(unsafe.Pointer(mapPtrUint + 9))
+	return 1 << *BPtr, nil // 2^B
 }
 
 // inspectMapBucket 检查Redis对象字典中指定索引的bucket
 // 参数m: Redis对象字典
 // 参数bucketIndex: bucket索引
 // 返回值: 指定bucket中的键值对元素列表
-func inspectMapBucket(m map[string]*robj, bucketIndex int) ([]bucketElement, error) {
+func inspectMapBucket(m map[string]*redisObject, bucketIndex int) ([]bucketElement, error) {
 	mapValue, err := validateMap(m)
 	if err != nil {
 		return nil, err
@@ -59,7 +55,9 @@ func inspectMapBucket(m map[string]*robj, bucketIndex int) ([]bucketElement, err
 
 	// 验证bucket索引
 	if bucketIndex < 0 {
-		return nil, fmt.Errorf("bucket索引不能为负数: %d", bucketIndex)
+		errMsg := fmt.Sprintf("bucket索引不能为负数: %d", bucketIndex)
+		log.Println(errMsg)
+		return nil, errors.New(errMsg)
 	}
 
 	// 使用反射来模拟功能，并根据索引过滤元素
@@ -85,7 +83,7 @@ func inspectMapBucket(m map[string]*robj, bucketIndex int) ([]bucketElement, err
 // inspectAllMapBuckets 检查Redis对象字典中的所有buckets
 // 参数m: Redis对象字典
 // 返回值: 所有bucket中的键值对元素列表
-func inspectAllMapBuckets(m map[string]*robj) ([][]bucketElement, error) {
+func inspectAllMapBuckets(m map[string]*redisObject) ([][]bucketElement, error) {
 	mapValue, err := validateMap(m)
 	if err != nil {
 		return nil, err
@@ -116,4 +114,24 @@ func inspectAllMapBuckets(m map[string]*robj) ([][]bucketElement, error) {
 	}
 
 	return buckets, nil
+}
+
+// validateMap 验证输入的Redis对象字典是否有效
+// 参数m: 待验证的Redis对象字典
+// 返回值: 字典的反射值和错误信息
+func validateMap(m map[string]*redisObject) (reflect.Value, error) {
+	if m == nil {
+		err := errors.New("字典不能为空")
+		log.Println(err)
+		return reflect.Value{}, err
+	}
+
+	mapValue := reflect.ValueOf(m)
+	if mapValue.Kind() != reflect.Map {
+		err := errors.New("输入参数不是有效的字典类型")
+		log.Println(err)
+		return reflect.Value{}, err
+	}
+
+	return mapValue, nil
 }
