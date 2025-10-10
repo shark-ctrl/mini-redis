@@ -11,7 +11,7 @@ const DICT_HT_INITIAL_SIZE = 4
  * 字典键值对定义
  */
 type dictEntry struct {
-	key  *interface{}
+	key  *string
 	val  *interface{}
 	next *dictEntry
 }
@@ -74,6 +74,55 @@ func _dictReset(ht *dictht) {
 	ht.size = 0
 	ht.sizemask = 0
 	ht.used = 0
+}
+
+// 渐进式哈希
+func dictRehash(d *dict, n int) int {
+	//最大容错次数
+	empty_visits := n * 10
+
+	if dictIsRehashing(d) {
+		return 0
+	}
+	//循环n次的渐进式重试，在最大限制内完成
+	for n > 0 && d.ht[0].used != 0 {
+		n--
+		var de *dictEntry
+		var nextde *dictEntry
+		for (*(d.ht[0].table))[d.rehashidx] == nil {
+			d.rehashidx++
+			empty_visits--
+
+			if empty_visits == 0 {
+				return 1
+			}
+		}
+		de = (*(d.ht[0].table))[d.rehashidx]
+
+		for de != nil {
+			nextde = de.next
+			h := dictGenHashFunction(de.key, len(*(de.key))&d.ht[1].sizemask)
+			de.next = (*(d.ht[1].table))[h]
+			(*(d.ht[1].table))[h] = de
+
+			d.ht[0].used--
+			d.ht[1].used++
+
+			de = nextde
+		}
+		(*(d.ht[0].table))[d.rehashidx] = nil
+		d.rehashidx++
+	}
+	//原子交换判断
+	if d.ht[0].used == 0 {
+		d.ht[0].table = nil
+		d.ht[0] = d.ht[1]
+		_dictReset(&(d.ht[1]))
+		d.rehashidx = -1
+	}
+
+	return 1
+
 }
 
 // 字典扩容
@@ -160,8 +209,8 @@ func dictAddRaw(d *dict, k *string) *dictEntry {
 	}
 
 	//将key设置到对应table的拉链上，并维护必要的信息
-	i := interface{}(k)
-	entry := &dictEntry{key: &i}
+
+	entry := &dictEntry{key: k}
 	entry.next = (*(ht.table))[index]
 	ht.used++
 
