@@ -76,6 +76,36 @@ func _dictReset(ht *dictht) {
 	ht.used = 0
 }
 
+// 字典扩容
+func dictExpand(d *dict, size uint64) int {
+	var n dictht
+	//获取实际空间
+	realSize := _dictNextPower(size)
+	//健壮性校验
+	if dictIsRehashing(d) || d.ht[0].used > size {
+		return DICT_ERR
+	}
+
+	if realSize == d.ht[0].size {
+		return DICT_ERR
+	}
+
+	n.size = realSize
+	n.sizemask = int(realSize - 1)
+	n.table = &[]*dictEntry{}
+	n.used = 0
+
+	if d.ht[0].table == nil {
+		d.ht[0] = n
+		return DICT_OK
+	}
+	d.ht[1] = n
+	d.rehashidx = 0
+
+	return DICT_OK
+
+}
+
 func _dictNextPower(size uint64) uint64 {
 	i := DICT_HT_INITIAL_SIZE
 
