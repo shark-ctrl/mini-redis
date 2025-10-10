@@ -1,8 +1,11 @@
 package main
 
+import "math"
+
 const dict_hash_function_seed = 5381
 const DICT_OK = 0
 const DICT_ERR = 1
+const DICT_HT_INITIAL_SIZE = 4
 
 /**
  * 字典键值对定义
@@ -44,6 +47,49 @@ type dictType struct {
 	keyCompare    func(privdata *interface{}, key1 *string, key2 *string) bool
 	keyDestructor func(privdata *interface{}, key *interface{})
 	valDestructor func(privdata *interface{}, obj *interface{})
+}
+
+func dictCreate(typePtr *dictType, privDataPtr *interface{}) dict {
+	d := &dict{}
+	_dictInit(d, privDataPtr, typePtr)
+	return *d
+}
+
+func _dictInit(d *dict, privDataPtr *interface{},
+	typePtr *dictType) int {
+
+	_dictReset(&(d.ht)[0])
+	_dictReset(&(d.ht)[1])
+	d.privdata = privDataPtr
+	d.dType = typePtr
+	d.rehashidx = -1
+	d.iterators = 0
+
+	return DICT_OK
+
+}
+
+func _dictReset(ht *dictht) {
+	ht.table = nil
+	ht.size = 0
+	ht.sizemask = 0
+	ht.used = 0
+}
+
+func _dictNextPower(size uint64) uint64 {
+	i := DICT_HT_INITIAL_SIZE
+
+	if size >= math.MaxInt64 {
+		return math.MaxInt64 + 1
+	}
+
+	for true {
+		if uint64(i) >= size {
+			break
+		}
+		i = i << 1
+	}
+	return uint64(i)
 }
 
 func dictReplace(d map[string]*robj, key *robj, val *robj) bool {
