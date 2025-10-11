@@ -1,18 +1,22 @@
 package main
 
-import "math"
+import (
+	"math"
+)
 
 const dict_hash_function_seed = 5381
 const DICT_OK = 0
 const DICT_ERR = 1
 const DICT_HT_INITIAL_SIZE = 4
+const dict_can_resize = 1
+const dict_force_resize_ratio = 5
 
 /**
  * 字典键值对定义
  */
 type dictEntry struct {
-	key  *string
-	val  *interface{}
+	key  *robj
+	val  *robj
 	next *dictEntry
 }
 
@@ -50,9 +54,9 @@ type dictType struct {
 }
 
 func dictCreate(typePtr *dictType, privDataPtr *interface{}) dict {
-	d := &dict{}
-	_dictInit(d, privDataPtr, typePtr)
-	return *d
+	d := dict{}
+	_dictInit(&d, privDataPtr, typePtr)
+	return d
 }
 
 func _dictInit(d *dict, privDataPtr *interface{},
@@ -74,6 +78,203 @@ func _dictReset(ht *dictht) {
 	ht.size = 0
 	ht.sizemask = 0
 	ht.used = 0
+}
+
+func _dictExpandIfNeeded(d *dict) int {
+	if dictIsRehashing(d) {
+		return DICT_OK
+	}
+
+	if d.ht[0].size == 0 {
+		dictExpand(d, DICT_HT_INITIAL_SIZE)
+	}
+
+	if d.ht[0].used >= d.ht[0].size &&
+		(dict_can_resize == 1 || d.ht[0].used/d.ht[0].size > dict_force_resize_ratio) {
+		dictExpand(d, d.ht[0].size<<1)
+	}
+	return DICT_OK
+}
+
+func dictAdd(d *dict, k *robj, v *robj) int {
+	entry := dictAddRaw(d, k)
+	if entry == nil {
+		return DICT_ERR
+	}
+	entry.val = v
+	return DICT_OK
+}
+
+func dictAddRaw(d *dict, k *robj) *dictEntry {
+
+	if dictIsRehashing(d) {
+		_dictRehashStep(d)
+	}
+
+	index := _dictKeyIndex(d, k)
+	//检查key是否存在
+	if index == -1 {
+		return nil
+
+	}
+	//根据渐进式哈希表确定table
+	var ht dictht
+	if dictIsRehashing(d) {
+		ht = d.ht[1]
+	} else {
+		ht = d.ht[0]
+	}
+
+	//将key设置到对应table的拉链上，并维护必要的信息
+
+	entry := &dictEntry{key: k}
+	entry.next = (*(ht.table))[index]
+	ht.used++
+
+	return entry
+}
+
+func dictDelete(ht *dict, key *string) int {
+	return dictGenericDelete(ht, key, 0)
+}
+
+// 删除字典中的key
+func dictGenericDelete(d *dict, k *string, nofree int) int {
+	if d.ht[0].size == 0 {
+		return DICT_ERR
+	}
+
+	if dictIsRehashing(d) {
+		_dictRehashStep(d)
+	}
+
+	h := dictGenHashFunction(k, len(*k))
+	var preDe *dictEntry
+
+	for i := 0; i < 2; i++ {
+		idx := h & d.ht[i].sizemask
+		he := (*(d.ht[i].table))[idx]
+
+		for he != nil {
+			if (*he.key.ptr).(*string) == k {
+				if preDe != nil {
+					preDe.next = he.next
+				} else {
+					(*(d.ht[0].table))[idx].next = he.next
+				}
+				d.ht[i].used--
+				if nofree != 0 {
+					//help gc
+					he = nil
+				}
+				return DICT_OK
+			}
+			preDe = he
+			he = he.next
+		}
+
+		if !dictIsRehashing(d) {
+			break
+		}
+	}
+
+	return DICT_ERR
+}
+
+func dictReplace_new(d map[string]*robj, key *robj, val *robj) bool {
+	k := (*key.ptr).(string)
+	if _, e := d[k]; e {
+		d[k] = val
+		return false
+	} else {
+		d[k] = val
+		return true
+	}
+
+}
+
+func dictReplace(d *dict, key *robj, val *robj) bool {
+	if dictAdd(d, key, val) == DICT_OK {
+		return true
+	}
+
+	entry := dictFind(d, (*key.ptr).(*string))
+	if entry == nil {
+		return false
+	}
+	entry.val = val
+	return true
+
+}
+
+func dictFind(d *dict, key *string) *dictEntry {
+
+	if d.ht[0].used+d.ht[1].used == 0 {
+		return nil
+	}
+
+	if dictIsRehashing(d) {
+		_dictRehashStep(d)
+	}
+
+	h := dictGenHashFunction(key, len(*key))
+	for i := 0; i < 2; i++ {
+		idx := h & d.ht[i].sizemask
+		he := (*d.ht[0].table)[idx]
+		for he != nil {
+			if (*he.key.ptr).(*string) == key {
+				return he
+			}
+			he = he.next
+		}
+		if !dictIsRehashing(d) {
+			break
+		}
+	}
+
+	return nil
+
+}
+
+func dictIsRehashing(d *dict) bool {
+	return d.rehashidx != -1
+}
+
+func _dictKeyIndex(d *dict, key *robj) int {
+
+	var idx int
+	if _dictExpandIfNeeded(d) == DICT_ERR {
+		return -1
+	}
+
+	//计算索引位置
+	h := d.dType.hashFunction((*key.ptr).(*string))
+
+	//基于索引定位key
+	for i := 0; i < 2; i++ {
+		idx := h & d.ht[i].sizemask
+		he := (*(d.ht[i].table))[idx]
+
+		for he != nil {
+			if d.dType.keyCompare(nil, (*key.ptr).(*string), (*he.key.ptr).(*string)) {
+				return -1
+			}
+			he = he.next
+		}
+
+		// 如果正在rehash，则检查ht[1]
+		if dictIsRehashing(d) {
+			break
+		}
+	}
+
+	return idx
+}
+
+func _dictRehashStep(d *dict) {
+	if d.iterators == 0 {
+		dictRehash(d, 0)
+	}
 }
 
 // 渐进式哈希
@@ -101,7 +302,7 @@ func dictRehash(d *dict, n int) int {
 
 		for de != nil {
 			nextde = de.next
-			h := dictGenHashFunction(de.key, len(*(de.key))&d.ht[1].sizemask)
+			h := dictGenHashFunction((*de.key.ptr).(*string), len(*(*de.key.ptr).(*string))&d.ht[1].sizemask)
 			de.next = (*(d.ht[1].table))[h]
 			(*(d.ht[1].table))[h] = de
 
@@ -169,84 +370,4 @@ func _dictNextPower(size uint64) uint64 {
 		i = i << 1
 	}
 	return uint64(i)
-}
-
-func dictReplace(d map[string]*robj, key *robj, val *robj) bool {
-	k := (*key.ptr).(string)
-	if _, e := d[k]; e {
-		d[k] = val
-		return false
-	} else {
-		d[k] = val
-		return true
-	}
-}
-
-func dictAdd(d *dict, k *string, v *interface{}) int {
-	entry := dictAddRaw(d, k)
-	if entry == nil {
-		return DICT_ERR
-	}
-	entry.val = v
-	return DICT_OK
-}
-
-func dictAddRaw(d *dict, k *string) *dictEntry {
-	//todo 判断是否需要渐进式哈希
-
-	index := _dictKeyIndex(d, k)
-	//检查key是否存在
-	if index == -1 {
-		return nil
-
-	}
-	//根据渐进式哈希表确定table
-	var ht dictht
-	if dictIsRehashing(d) {
-		ht = d.ht[1]
-	} else {
-		ht = d.ht[0]
-	}
-
-	//将key设置到对应table的拉链上，并维护必要的信息
-
-	entry := &dictEntry{key: k}
-	entry.next = (*(ht.table))[index]
-	ht.used++
-
-	return entry
-}
-
-func dictIsRehashing(d *dict) bool {
-	return d.rehashidx != -1
-}
-
-func _dictKeyIndex(d *dict, key *string) int {
-
-	var idx int
-	//todo 判断是否需要扩容
-
-	//计算索引位置
-
-	h := d.dType.hashFunction(key)
-
-	//基于索引定位key
-	for i := 0; i < 2; i++ {
-		idx := h & d.ht[i].sizemask
-		he := (*(d.ht[i].table))[idx]
-
-		for he != nil {
-			if d.dType.keyCompare(nil, key, key) {
-				return -1
-			}
-			he = he.next
-		}
-
-		// 如果正在rehash，则检查ht[1]
-		if dictIsRehashing(d) {
-			break
-		}
-	}
-
-	return idx
 }

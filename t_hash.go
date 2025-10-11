@@ -66,7 +66,7 @@ func hashTypeSet(o *robj, field *robj, value *robj) int {
 		that the current operation is an update
 
 		*/
-		if dictReplace(m, field, value) {
+		if dictReplace_new(m, field, value) {
 			return 0
 		}
 		return 1
