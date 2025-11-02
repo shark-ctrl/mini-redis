@@ -48,7 +48,7 @@ type dictType struct {
 	hashFunction  func(key string) int
 	keyDup        func(privdata *interface{}, key *interface{}) *interface{}
 	valDup        func(privdata *interface{}, obj *interface{}) *interface{}
-	keyCompare    func(privdata *interface{}, key1 *string, key2 *string) bool
+	keyCompare    func(privdata *interface{}, key1 string, key2 string) bool
 	keyDestructor func(privdata *interface{}, key *interface{})
 	valDestructor func(privdata *interface{}, obj *interface{})
 }
@@ -136,12 +136,12 @@ func dictAddRaw(d *dict, k *robj) *dictEntry {
 	return entry
 }
 
-func dictDelete(ht *dict, key *string) int {
+func dictDelete(ht *dict, key string) int {
 	return dictGenericDelete(ht, key, 0)
 }
 
 // 删除字典中的key
-func dictGenericDelete(d *dict, k *string, nofree int) int {
+func dictGenericDelete(d *dict, k string, nofree int) int {
 	if d.ht[0].size == 0 {
 		return DICT_ERR
 	}
@@ -150,7 +150,7 @@ func dictGenericDelete(d *dict, k *string, nofree int) int {
 		_dictRehashStep(d)
 	}
 
-	h := dictGenHashFunction(*k, len(*k))
+	h := dictGenHashFunction(k, len(k))
 	var preDe *dictEntry
 
 	for i := 0; i < 2; i++ {
@@ -158,11 +158,11 @@ func dictGenericDelete(d *dict, k *string, nofree int) int {
 		he := (*(d.ht[i].table))[idx]
 
 		for he != nil {
-			if (*he.key.ptr).(*string) == k {
+			if (*he.key.ptr).(string) == k {
 				if preDe != nil {
 					preDe.next = he.next
 				} else {
-					(*(d.ht[0].table))[idx].next = he.next
+					(*(d.ht[0].table))[idx] = he.next
 				}
 				d.ht[i].used--
 				if nofree != 0 {
@@ -200,7 +200,7 @@ func dictReplace(d *dict, key *robj, val *robj) bool {
 		return true
 	}
 
-	entry := dictFind(d, (*key.ptr).(*string))
+	entry := dictFind(d, (*key.ptr).(string))
 	if entry == nil {
 		return false
 	}
@@ -209,7 +209,7 @@ func dictReplace(d *dict, key *robj, val *robj) bool {
 
 }
 
-func dictFind(d *dict, key *string) *dictEntry {
+func dictFind(d *dict, key string) *dictEntry {
 
 	if d.ht[0].used+d.ht[1].used == 0 {
 		return nil
@@ -219,12 +219,12 @@ func dictFind(d *dict, key *string) *dictEntry {
 		_dictRehashStep(d)
 	}
 
-	h := dictGenHashFunction(*key, len(*key))
+	h := dictGenHashFunction(key, len(key))
 	for i := 0; i < 2; i++ {
 		idx := h & d.ht[i].sizemask
 		he := (*d.ht[0].table)[idx]
 		for he != nil {
-			if (*he.key.ptr).(*string) == key {
+			if (*he.key.ptr).(string) == key {
 				return he
 			}
 			he = he.next
@@ -258,7 +258,7 @@ func _dictKeyIndex(d *dict, key *robj) int {
 		he := (*(d.ht[i].table))[idx]
 
 		for he != nil {
-			if d.dType.keyCompare(nil, (*key.ptr).(*string), (*he.key.ptr).(*string)) {
+			if d.dType.keyCompare(nil, (*key.ptr).(string), (*he.key.ptr).(string)) {
 				return -1
 			}
 			he = he.next
@@ -275,7 +275,7 @@ func _dictKeyIndex(d *dict, key *robj) int {
 
 func _dictRehashStep(d *dict) {
 	if d.iterators == 0 {
-		dictRehash(d, 0)
+		dictRehash(d, 1)
 	}
 }
 
@@ -284,7 +284,7 @@ func dictRehash(d *dict, n int) int {
 	//最大容错次数
 	empty_visits := n * 10
 
-	if dictIsRehashing(d) {
+	if !dictIsRehashing(d) {
 		return 0
 	}
 	//循环n次的渐进式重试，在最大限制内完成
@@ -304,7 +304,7 @@ func dictRehash(d *dict, n int) int {
 
 		for de != nil {
 			nextde = de.next
-			h := dictGenHashFunction((*de.key.ptr).(string), len(*(*de.key.ptr).(*string))&d.ht[1].sizemask)
+			h := dictGenHashFunction((*de.key.ptr).(string), len((*de.key.ptr).(string))) & d.ht[1].sizemask
 			de.next = (*(d.ht[1].table))[h]
 			(*(d.ht[1].table))[h] = de
 

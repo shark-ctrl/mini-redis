@@ -57,6 +57,6 @@ func dictGenHashFunction(key string, kLen int) int {
 
 }
 
-func dictCompare(privdata *interface{}, key1 *string, key2 *string) bool {
-	return *key1 == *key2
+func dictCompare(privdata *interface{}, key1 string, key2 string) bool {
+	return key1 == key2
 }
