@@ -13,18 +13,18 @@ var dbDictType = dictType{
 	valDestructor: nil,
 }
 
-func dictSdsHash(key *string) int {
-	return dictGenHashFunction(key, len(*key))
+func dictSdsHash(key string) int {
+	return dictGenHashFunction(key, len(key))
 }
 
-func dictGenHashFunction(key *string, kLen int) int {
+func dictGenHashFunction(key string, kLen int) int {
 	var seed int = dict_hash_function_seed
 	var m int = 0x5bd1e995
 	var r int = 24
 
 	var h int = seed ^ kLen
 
-	runes := []rune(*key)
+	runes := []rune(key)
 	pos := 0
 
 	for kLen >= 4 {

@@ -45,7 +45,7 @@ type dict struct {
  * 字典类型特定函数定义
  */
 type dictType struct {
-	hashFunction  func(key *string) int
+	hashFunction  func(key string) int
 	keyDup        func(privdata *interface{}, key *interface{}) *interface{}
 	valDup        func(privdata *interface{}, obj *interface{}) *interface{}
 	keyCompare    func(privdata *interface{}, key1 *string, key2 *string) bool
@@ -53,9 +53,10 @@ type dictType struct {
 	valDestructor func(privdata *interface{}, obj *interface{})
 }
 
-func dictCreate(typePtr *dictType, privDataPtr *interface{}) dict {
-	d := dict{}
-	_dictInit(&d, privDataPtr, typePtr)
+func dictCreate(typePtr *dictType, privDataPtr *interface{}) *dict {
+	d := new(dict)
+	d.ht = &[2]dictht{}
+	_dictInit(d, privDataPtr, typePtr)
 	return d
 }
 
@@ -118,17 +119,18 @@ func dictAddRaw(d *dict, k *robj) *dictEntry {
 
 	}
 	//根据渐进式哈希表确定table
-	var ht dictht
+	var ht *dictht
 	if dictIsRehashing(d) {
-		ht = d.ht[1]
+		ht = &d.ht[1]
 	} else {
-		ht = d.ht[0]
+		ht = &d.ht[0]
 	}
 
 	//将key设置到对应table的拉链上，并维护必要的信息
 
 	entry := &dictEntry{key: k}
 	entry.next = (*(ht.table))[index]
+	(*(ht.table))[index] = entry
 	ht.used++
 
 	return entry
@@ -148,7 +150,7 @@ func dictGenericDelete(d *dict, k *string, nofree int) int {
 		_dictRehashStep(d)
 	}
 
-	h := dictGenHashFunction(k, len(*k))
+	h := dictGenHashFunction(*k, len(*k))
 	var preDe *dictEntry
 
 	for i := 0; i < 2; i++ {
@@ -217,7 +219,7 @@ func dictFind(d *dict, key *string) *dictEntry {
 		_dictRehashStep(d)
 	}
 
-	h := dictGenHashFunction(key, len(*key))
+	h := dictGenHashFunction(*key, len(*key))
 	for i := 0; i < 2; i++ {
 		idx := h & d.ht[i].sizemask
 		he := (*d.ht[0].table)[idx]
@@ -248,11 +250,11 @@ func _dictKeyIndex(d *dict, key *robj) int {
 	}
 
 	//计算索引位置
-	h := d.dType.hashFunction((*key.ptr).(*string))
+	h := d.dType.hashFunction((*key.ptr).(string))
 
 	//基于索引定位key
 	for i := 0; i < 2; i++ {
-		idx := h & d.ht[i].sizemask
+		idx = h & d.ht[i].sizemask
 		he := (*(d.ht[i].table))[idx]
 
 		for he != nil {
@@ -263,7 +265,7 @@ func _dictKeyIndex(d *dict, key *robj) int {
 		}
 
 		// 如果正在rehash，则检查ht[1]
-		if dictIsRehashing(d) {
+		if !dictIsRehashing(d) {
 			break
 		}
 	}
@@ -302,7 +304,7 @@ func dictRehash(d *dict, n int) int {
 
 		for de != nil {
 			nextde = de.next
-			h := dictGenHashFunction((*de.key.ptr).(*string), len(*(*de.key.ptr).(*string))&d.ht[1].sizemask)
+			h := dictGenHashFunction((*de.key.ptr).(string), len(*(*de.key.ptr).(*string))&d.ht[1].sizemask)
 			de.next = (*(d.ht[1].table))[h]
 			(*(d.ht[1].table))[h] = de
 
@@ -343,6 +345,9 @@ func dictExpand(d *dict, size uint64) int {
 	n.size = realSize
 	n.sizemask = int(realSize - 1)
 	n.table = &[]*dictEntry{}
+	table := make([]*dictEntry, realSize)
+	n.table = &table
+
 	n.used = 0
 
 	if d.ht[0].table == nil {
