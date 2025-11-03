@@ -3,8 +3,10 @@ package main
 import "time"
 
 type redisDb struct {
-	dict    map[string]*robj
-	expires map[string]int64
+	//dict    map[string]*robj
+	//expires map[string]int64
+	dict    dict
+	expires dict
 	id      int
 }
 
@@ -26,10 +28,14 @@ func lookupKeyWrite(db *redisDb, key *robj) *robj {
 
 func expireIfNeeded(db *redisDb, key *robj) int {
 	//get the expiration time of the key.
-	when, exists := db.expires[(*key.ptr).(string)]
-	if !exists {
+	//when, exists := db.expires[(*key.ptr).(string)]
+	entry := dictFind(&db.expires, (*key.ptr).(string))
+
+	if entry == nil {
 		return 0
 	}
+
+	when := (*entry.val.ptr).(int64)
 	if when < 0 {
 		return 0
 	}
@@ -39,15 +45,17 @@ func expireIfNeeded(db *redisDb, key *robj) int {
 		return 0
 	}
 	//delete expired keys.
-	deDelete(db, key)
+	dbDelete(db, key)
 
 	return 1
 
 }
 
-func deDelete(db *redisDb, key *robj) {
-	delete(db.expires, (*key.ptr).(string))
-	delete(db.dict, (*key.ptr).(string))
+func dbDelete(db *redisDb, key *robj) {
+	//delete(db.expires, (*key.ptr).(string))
+	//delete(db.dict, (*key.ptr).(string))
+	dictDelete(&db.dict, (*key.ptr).(string))
+	dictDelete(&db.expires, (*key.ptr).(string))
 }
 
 func lookupKeyRead(db *redisDb, key *robj) *robj {
@@ -58,8 +66,12 @@ func lookupKeyRead(db *redisDb, key *robj) *robj {
 }
 
 func lookupKey(db *redisDb, key *robj) *robj {
-	val := db.dict[(*key.ptr).(string)]
-	return val
+	//val := db.dict[(*key.ptr).(string)]
+	de := dictFind(&db.dict, (*key.ptr).(string))
+	if de == nil {
+		return nil
+	}
+	return de.val
 }
 
 func lookupKeyReadOrReply(c *redisClient, key *robj, reply *string) *robj {
@@ -72,14 +84,14 @@ func lookupKeyReadOrReply(c *redisClient, key *robj, reply *string) *robj {
 }
 
 func dbAdd(db *redisDb, key *robj, val *robj) {
-	db.dict[(*key.ptr).(string)] = val
+	//db.dict[(*key.ptr).(string)] = val
+	dictAdd(&db.dict, key, val)
 }
 
 func dbOverwrite(db *redisDb, key *robj, val *robj) {
-	db.dict[(*key.ptr).(string)] = val
-}
-
-func dbDelete(db *redisDb, key *robj) int64 {
-	delete(db.dict, (*key.ptr).(string))
-	return 1
+	de := dictFind(&db.dict, (*key.ptr).(string))
+	if de == nil {
+		panic("de is null")
+	}
+	dictReplace(&db.dict, key, val)
 }

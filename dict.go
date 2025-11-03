@@ -15,8 +15,11 @@ const dict_force_resize_ratio = 5
  * 字典键值对定义
  */
 type dictEntry struct {
-	key  *robj
-	val  *robj
+	//存储key
+	key *robj
+	//存储value
+	val *robj
+	//存储后继节点
 	next *dictEntry
 }
 
@@ -24,18 +27,22 @@ type dictEntry struct {
  * 字典哈希表定义
  */
 type dictht struct {
-	table    *[]*dictEntry
+	//存储键值对的数组
+	table *[]*dictEntry
+	//记录hash table的大小
 	size     uint64
 	sizemask int
-	used     uint64
+	//记录数组存储了多少个键值对
+	used uint64
 }
 
 /**
  * 字典核心数据结构定义
  */
 type dict struct {
-	dType     *dictType
-	privdata  *interface{}
+	dType    *dictType
+	privdata *interface{}
+	//存储键值对的两个数组
 	ht        *[2]dictht
 	rehashidx int64
 	iterators int
@@ -54,20 +61,23 @@ type dictType struct {
 }
 
 func dictCreate(typePtr *dictType, privDataPtr *interface{}) *dict {
-	d := new(dict)
-	d.ht = &[2]dictht{}
-	_dictInit(d, privDataPtr, typePtr)
-	return d
+	//初始化字典及其ht数组空间
+	d := dict{ht: &[2]dictht{}}
+	_dictInit(&d, privDataPtr, typePtr)
+	return &d
 }
 
 func _dictInit(d *dict, privDataPtr *interface{},
 	typePtr *dictType) int {
-
+	//重置哈希表空间
 	_dictReset(&(d.ht)[0])
 	_dictReset(&(d.ht)[1])
+
 	d.privdata = privDataPtr
 	d.dType = typePtr
+	//设置rehashidx为-1,代表当前不存在渐进式哈希
 	d.rehashidx = -1
+	//设置iterators为0,代表字典并不存在迭代
 	d.iterators = 0
 
 	return DICT_OK
@@ -98,20 +108,22 @@ func _dictExpandIfNeeded(d *dict) int {
 }
 
 func dictAdd(d *dict, k *robj, v *robj) int {
+	//将key存储到哈希表某个索引中,如果成功则返回这个key对应的entry的指针
 	entry := dictAddRaw(d, k)
 	if entry == nil {
 		return DICT_ERR
 	}
+	//将entry的val设置为v
 	entry.val = v
 	return DICT_OK
 }
 
 func dictAddRaw(d *dict, k *robj) *dictEntry {
-
+	//如果正处于渐进式哈希则会驱逐一部分元素到数组1中
 	if dictIsRehashing(d) {
 		_dictRehashStep(d)
 	}
-
+	//检查索引是否正确，若为-1则说明异常直接返回nil
 	index := _dictKeyIndex(d, k)
 	//检查key是否存在
 	if index == -1 {
@@ -126,11 +138,11 @@ func dictAddRaw(d *dict, k *robj) *dictEntry {
 		ht = &d.ht[0]
 	}
 
-	//将key设置到对应table的拉链上，并维护必要的信息
-
+	//通过头插法将元素插入到数组中
 	entry := &dictEntry{key: k}
 	entry.next = (*(ht.table))[index]
 	(*(ht.table))[index] = entry
+	//累加used告知数组增加一个元素
 	ht.used++
 
 	return entry
@@ -183,6 +195,7 @@ func dictGenericDelete(d *dict, k string, nofree int) int {
 	return DICT_ERR
 }
 
+// 原有go map字典操作更新函数,已废弃
 func dictReplace_new(d map[string]*robj, key *robj, val *robj) bool {
 	k := (*key.ptr).(string)
 	if _, e := d[k]; e {
@@ -196,32 +209,36 @@ func dictReplace_new(d map[string]*robj, key *robj, val *robj) bool {
 }
 
 func dictReplace(d *dict, key *robj, val *robj) bool {
+	//先尝试用dictadd添加键值对,若成功则说明这个key不存在,完成后直接返回
 	if dictAdd(d, key, val) == DICT_OK {
 		return true
 	}
-
-	entry := dictFind(d, (*key.ptr).(string))
-	if entry == nil {
+	//否则通过dictFind定位到entry,修改值再返回true
+	de := dictFind(d, (*key.ptr).(string))
+	if de == nil {
 		return false
 	}
-	entry.val = val
+	de.val = val
 	return true
 
 }
 
 func dictFind(d *dict, key string) *dictEntry {
-
+	//查看哈希表数组是否都为空,若都为空则直接返回
 	if d.ht[0].used+d.ht[1].used == 0 {
 		return nil
 	}
-
+	//若元素正处于渐进式哈希则进行一次元素驱逐
 	if dictIsRehashing(d) {
 		_dictRehashStep(d)
 	}
-
+	//定位查询key对应的哈希值
 	h := dictGenHashFunction(key, len(key))
+	//执行最多两次的遍历(因为我们有两个哈希表,一个未扩容前使用,一个出发扩容后作为渐进式哈希的驱逐点)
 	for i := 0; i < 2; i++ {
+		//基于位运算定位索引
 		idx := h & d.ht[i].sizemask
+		//定位到对应bucket桶,通过遍历定位到本次要检索的key
 		he := (*d.ht[0].table)[idx]
 		for he != nil {
 			if (*he.key.ptr).(string) == key {
@@ -229,6 +246,7 @@ func dictFind(d *dict, key string) *dictEntry {
 			}
 			he = he.next
 		}
+		//若未进行渐进式哈希则说明哈希表-1没有元素,直接结束循环,反之执行2次遍历
 		if !dictIsRehashing(d) {
 			break
 		}
@@ -254,9 +272,10 @@ func _dictKeyIndex(d *dict, key *robj) int {
 
 	//基于索引定位key
 	for i := 0; i < 2; i++ {
+		//通过位运算计算数组存储的索引
 		idx = h & d.ht[i].sizemask
 		he := (*(d.ht[i].table))[idx]
-
+		//判断这个索引下是否存在相同的key,如果存在则返回-1,告知外部不用添加entry,有需要直接改dictentry的val即可
 		for he != nil {
 			if d.dType.keyCompare(nil, (*key.ptr).(string), (*he.key.ptr).(string)) {
 				return -1

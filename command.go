@@ -138,11 +138,13 @@ func setGenericCommand(c *redisClient, flags int, key *robj, val *robj, expire s
 	//if `expire` is not empty, add the converted value to the current time to obtain the expiration time. Then,
 	//use the passed key as the key and the expiration time as the value to store in the `expires` dictionary.
 	if expire != "" {
-		c.db.expires[(*key.ptr).(string)] = time.Now().UnixMilli() + *milliseconds
+		//c.db.expires[(*key.ptr).(string)] =
+		when := createStringObjectFromLongLong(time.Now().UnixMilli() + *milliseconds)
+		dictReplace(&c.db.expires, key, when)
 	}
 	//store the key-value pair in a dictionary.
-	c.db.dict[(*key.ptr).(string)] = val
-
+	//c.db.dict[(*key.ptr).(string)] = val
+	dbAdd(c.db, key, val)
 	addReply(c, shared.ok)
 }
 
@@ -699,75 +701,75 @@ func parseScanCursorOrReply(c *redisClient, o *robj, cursor *uint64) bool {
 }
 
 func scanGenericCommand(c *redisClient, o *robj, cursor *uint64) {
-	keys := listCreate()
-	var count int64
-	count = 10
-	var ht map[string]*robj
-
-	var i uint64
-	//判断是scan还是hscan等标识
-	if o == nil {
-		i = 2
-	} else {
-		i = 3
-	}
-	//参数解析
-	for ; i < c.argc; i += 2 {
-		j := c.argc - i
-		if "count" == (*c.argv[i].ptr).(string) && j >= 2 {
-			//解析count的值，若不合法直接执行后置清理
-			if !getLongFromObjectOrReply(c, c.argv[i+1], &count, nil) {
-				goto cleanup
-			}
-
-			if count < 1 {
-				addReply(c, shared.syntaxerr)
-				goto cleanup
-			}
-
-		}
-	}
-	//迭代key值
-	ht = c.db.dict
-	if ht != nil {
-		j := int64(0)
-		skip := int64(0)
-
-		for k := range ht {
-			if skip < int64(*cursor) {
-				skip++
-				continue
-			}
-			key := interface{}(k)
-			listAddNodeTail(keys, &key)
-			j++
-			if j == count {
-				*cursor = uint64(skip + count)
-				break
-			}
-		}
-	}
-
-	addReplyMultiBulkLen(c, 2)
-	if listLength(keys) != 0 {
-		addReplyLongLong(c, int64(*cursor))
-	} else {
-		addReplyLongLong(c, 0)
-	}
-
-	addReplyMultiBulkLen(c, listLength(keys))
-	for true {
-		node := listFirst(keys)
-		if node == nil {
-			break
-		}
-		s := (*node.value).(string)
-		o := createEmbeddedStringObject(&s, len(s))
-		addReplyBulk(c, o)
-		listDelNode(keys, node)
-	}
-
-cleanup:
-	//清理资源
-	listRelease(&keys)
+	//	keys := listCreate()
+	//	var count int64
+	//	count = 10
+	//	var ht map[string]*robj
+	//
+	//	var i uint64
+	//	//判断是scan还是hscan等标识
+	//	if o == nil {
+	//		i = 2
+	//	} else {
+	//		i = 3
+	//	}
+	//	//参数解析
+	//	for ; i < c.argc; i += 2 {
+	//		j := c.argc - i
+	//		if "count" == (*c.argv[i].ptr).(string) && j >= 2 {
+	//			//解析count的值，若不合法直接执行后置清理
+	//			if !getLongFromObjectOrReply(c, c.argv[i+1], &count, nil) {
+	//				goto cleanup
+	//			}
+	//
+	//			if count < 1 {
+	//				addReply(c, shared.syntaxerr)
+	//				goto cleanup
+	//			}
+	//
+	//		}
+	//	}
+	//	//迭代key值
+	//	ht = c.db.dict
+	//	if ht != nil {
+	//		j := int64(0)
+	//		skip := int64(0)
+	//
+	//		for k := range ht {
+	//			if skip < int64(*cursor) {
+	//				skip++
+	//				continue
+	//			}
+	//			key := interface{}(k)
+	//			listAddNodeTail(keys, &key)
+	//			j++
+	//			if j == count {
+	//				*cursor = uint64(skip + count)
+	//				break
+	//			}
+	//		}
+	//	}
+	//
+	//	addReplyMultiBulkLen(c, 2)
+	//	if listLength(keys) != 0 {
+	//		addReplyLongLong(c, int64(*cursor))
+	//	} else {
+	//		addReplyLongLong(c, 0)
+	//	}
+	//
+	//	addReplyMultiBulkLen(c, listLength(keys))
+	//	for true {
+	//		node := listFirst(keys)
+	//		if node == nil {
+	//			break
+	//		}
+	//		s := (*node.value).(string)
+	//		o := createEmbeddedStringObject(&s, len(s))
+	//		addReplyBulk(c, o)
+	//		listDelNode(keys, node)
+	//	}
+	//
+	//cleanup:
+	//	//清理资源
+	//	listRelease(&keys)
 }

@@ -155,8 +155,10 @@ func initServer() {
 
 	for j := 0; j < server.dbnum; j++ {
 		server.db[j].id = j
-		server.db[j].dict = make(map[string]*robj)
-		server.db[j].expires = make(map[string]int64)
+		//server.db[j].dict = make(map[string]*robj)
+		//server.db[j].expires = make(map[string]int64)
+		server.db[j].dict = *dictCreate(&dbDictType, nil)
+		server.db[j].expires = *dictCreate(&dbDictType, nil)
 	}
 }
 
