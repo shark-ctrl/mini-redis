@@ -148,7 +148,6 @@ func zslGetRank(zsl *zskiplist, score float64, obj *robj) int64 {
 	return 0
 }
 
-// todo 有问题
 func zslDelete(zsl *zskiplist, score float64, obj *robj) int64 {
 	update := make([]*zskiplistNode, ZSKIPLIST_MAXLEVEL)
 	//找到每层索引要删除节点的前一个节点
@@ -212,7 +211,7 @@ func zaddGenericCommand(c *redisClient, incr int) {
 	var ele *robj
 	var zobj *robj
 	var j uint64
-	var score float64
+	//var score float64
 	//初始化变量记录本次操作添加和更新的元素数
 	var added int64
 	var updated int64
@@ -249,7 +248,7 @@ func zaddGenericCommand(c *redisClient, incr int) {
 	//基于元素数遍历集合
 	for j = 0; j < elements; j++ {
 		//拿到本次元素对应的score
-		score = scores[j]
+		//score = scores[j]
 		//拿到对应的元素
 		ele = c.argv[3+j*2]
 		k := (*ele.ptr).(string)
@@ -259,17 +258,17 @@ func zaddGenericCommand(c *redisClient, incr int) {
 			//拿到当前元素对应的score
 			curScore := zs.dict[k]
 			//若不一样则更新字典中对应元素的score，并将该元素从跳表中删除再插入
-			if *curScore != score {
+			if *curScore != scores[j] {
 				zslDelete(zs.zsl, *curScore, c.argv[3+j*2])
-				zslInsert(zs.zsl, score, c.argv[3+j*2])
-				zs.dict[k] = &score
+				zslInsert(zs.zsl, scores[j], c.argv[3+j*2])
+				zs.dict[k] = &scores[j]
 				//维护更新数
 				updated++
 			}
 
 		} else { //若是新增则插入到有序集合对应的跳表和字典中
-			zslInsert(zs.zsl, score, c.argv[3+j*2])
-			zs.dict[k] = &score
+			zslInsert(zs.zsl, scores[j], c.argv[3+j*2])
+			zs.dict[k] = &scores[j]
 			//维护添加数
 			added++
 		}
