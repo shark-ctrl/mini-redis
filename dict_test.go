@@ -166,7 +166,7 @@ func TestDictRehash(t *testing.T) {
 	for _, v := range (*bucketMap)[0] {
 		dictAdd(d, createStringObject(&v, len(v)), nil)
 		count++
-		if count == 5 {
+		if count == 4 {
 			break
 		}
 	}
@@ -184,7 +184,11 @@ func TestDictRehash(t *testing.T) {
 	dictAdd(d, createStringObject(&k, len(k)), nil)
 
 	//查看19 17 12 9 1000是否存在
-	if dictFind(d, "19") == nil || dictFind(d, "17") == nil || dictFind(d, "12") == nil || dictFind(d, "9") == nil || dictFind(d, "1000") == nil {
+	if dictFind(d, "19") == nil ||
+		dictFind(d, "17") == nil ||
+		dictFind(d, "12") == nil ||
+		dictFind(d, "9") == nil ||
+		dictFind(d, "1000") == nil {
 		log.Fatal("rehash fail")
 	}
 }

@@ -154,6 +154,7 @@ func dictDelete(ht *dict, key string) int {
 
 // 删除字典中的key
 func dictGenericDelete(d *dict, k string, nofree int) int {
+	//若size为0则说明没有bucket还未初始化,直接返回错误
 	if d.ht[0].size == 0 {
 		return DICT_ERR
 	}
@@ -161,21 +162,23 @@ func dictGenericDelete(d *dict, k string, nofree int) int {
 	if dictIsRehashing(d) {
 		_dictRehashStep(d)
 	}
-
+	//哈希定位bucket
 	h := dictGenHashFunction(k, len(k))
 	var preDe *dictEntry
 
 	for i := 0; i < 2; i++ {
 		idx := h & d.ht[i].sizemask
 		he := (*(d.ht[i].table))[idx]
-
+		//遍历链表直到找到这个key
 		for he != nil {
 			if (*he.key.ptr).(string) == k {
+				//如果preDe非空则说明被删除元素he在中间,则将he前驱指向he后继
 				if preDe != nil {
 					preDe.next = he.next
-				} else {
+				} else { //否则说明被删除元素he是数组的第一个元素,则直接让数组的第一个元素为he的后继节点
 					(*(d.ht[0].table))[idx] = he.next
 				}
+				//减少used告知数组减少一个元素
 				d.ht[i].used--
 				if nofree != 0 {
 					//help gc
@@ -311,17 +314,20 @@ func dictRehash(d *dict, n int) int {
 		n--
 		var de *dictEntry
 		var nextde *dictEntry
+		//定位到非空的bucket桶
 		for (*(d.ht[0].table))[d.rehashidx] == nil {
 			d.rehashidx++
 			empty_visits--
-
+			//一旦访问空bucket超过10次则返回
 			if empty_visits == 0 {
 				return 1
 			}
 		}
+		//从非空的bucket桶开始
 		de = (*(d.ht[0].table))[d.rehashidx]
 
 		for de != nil {
+			//再哈希定位元素通过头插法迁移元素到ht[1]
 			nextde = de.next
 			h := dictGenHashFunction((*de.key.ptr).(string), len((*de.key.ptr).(string))) & d.ht[1].sizemask
 			de.next = (*(d.ht[1].table))[h]
@@ -332,10 +338,11 @@ func dictRehash(d *dict, n int) int {
 
 			de = nextde
 		}
+		//rehashidx+1告知下一次驱逐的索引位置
 		(*(d.ht[0].table))[d.rehashidx] = nil
 		d.rehashidx++
 	}
-	//原子交换判断
+	//ht[0]为空则原子交换,将ht[1]变为ht[0]
 	if d.ht[0].used == 0 {
 		d.ht[0].table = nil
 		d.ht[0] = d.ht[1]

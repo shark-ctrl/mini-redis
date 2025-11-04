@@ -148,6 +148,7 @@ func zslGetRank(zsl *zskiplist, score float64, obj *robj) int64 {
 	return 0
 }
 
+// todo 有问题
 func zslDelete(zsl *zskiplist, score float64, obj *robj) int64 {
 	update := make([]*zskiplistNode, ZSKIPLIST_MAXLEVEL)
 	//找到每层索引要删除节点的前一个节点
